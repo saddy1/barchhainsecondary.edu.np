@@ -1,0 +1,469 @@
+<?php
+
+namespace App\Http\Controllers\Card;
+
+use App\Http\Controllers\Controller;
+
+use App\Models\Card\Organization;
+use App\Models\Card\Student;
+use App\Services\MemberAccountService;
+use Illuminate\Http\Request;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\File;
+use Illuminate\Validation\Rule;
+use Illuminate\Validation\Rules\Password;
+
+class StudentController extends Controller
+{
+    protected function scopedStudentsQuery(array $ids = [])
+    {
+        $query = Student::query();
+
+        if (!empty($ids)) {
+            $query->whereIn('id', $ids);
+        }
+
+        auth()->user()->applyStudentScope($query);
+
+        return $query;
+    }
+
+    protected function deleteStudentPhoto(?string $photoPath): void
+    {
+        if (!$photoPath || !str_starts_with($photoPath, 'photos/')) {
+            return;
+        }
+
+        if (Student::where('photo', $photoPath)->count() > 1) {
+            return;
+        }
+
+        $absolutePath = public_path($photoPath);
+
+        if (File::exists($absolutePath)) {
+            File::delete($absolutePath);
+        }
+    }
+
+    protected function ensureStudentAccess(Student $student): void
+    {
+        if (auth()->user()->isSuperAdmin()) {
+            return;
+        }
+
+        $query = Student::query()->whereKey($student->id);
+        auth()->user()->applyStudentScope($query);
+
+        abort_unless($query->exists(), 403);
+    }
+
+    public function index(Request $request)
+    {
+        $query = Student::query();
+        $filterOptions = $this->buildFormOptions();
+
+        // Scope to admin's organization + optional department
+        auth()->user()->applyStudentScope($query);
+
+        if ($request->filled('search')) {
+            $s = $request->search;
+            $query->where(function ($q) use ($s) {
+                $q->where('first_name', 'like', "%$s%")
+                  ->orWhere('last_name', 'like', "%$s%")
+                  ->orWhere('roll_number', 'like', "%$s%")
+                  ->orWhere('email', 'like', "%$s%");
+            });
+        }
+
+        if ($request->filled('type')) {
+            $query->where('member_type', $request->type);
+        }
+
+        if ($request->filled('stream')) {
+            $query->where('stream', $request->stream);
+        }
+
+        if ($request->filled('section')) {
+            $query->where('section', $request->section);
+        }
+
+        $expiredCount = (clone $query)
+            ->whereNotNull('valid_till')
+            ->whereDate('valid_till', '<', now()->toDateString())
+            ->count();
+
+        $students = $query->latest()->paginate(15)->withQueryString();
+
+        return view('card.students.index', compact('students', 'filterOptions', 'expiredCount'));
+    }
+
+    public function create()
+    {
+        if (\App\Services\ModuleService::enabled('hr') && auth()->user()?->canAccess('hr.members.create')) {
+            return redirect()->route('admin.hr.members.create');
+        }
+
+        return view('card.students.create', [
+            'formOptions' => $this->buildFormOptions(),
+        ]);
+    }
+
+    public function store(Request $request)
+    {
+        $data = $request->validate([
+            'organization'    => 'required',
+            'member_type'     => 'required|in:student,teacher,staff',
+            'stream'          => 'nullable|string|max:100',
+            'section'         => 'nullable|string|max:50',
+            'roll_number'     => [
+                'required',
+                // Unique within the same org + stream + section group
+                Rule::unique('students')->where(fn ($q) => $q
+                    ->where('organization', $request->organization)
+                    ->where('stream', $request->stream ?: null)
+                    ->where('section', $request->section ?: null)
+                ),
+            ],
+            'first_name'      => 'required|string|max:100',
+            'middle_name'     => 'nullable|string|max:100',
+            'last_name'       => 'required|string|max:100',
+            'guardian_name'   => 'nullable|string|max:150',
+            'registration_no' => 'nullable|string|max:100',
+            'dob'             => 'nullable|date',
+            'citizenship_no'  => 'nullable|string|max:50',
+            'mobile'          => 'nullable|string|max:20',
+            'email'           => 'nullable|email',
+            'photo'           => 'nullable|image|max:' . ($request->member_type === 'student' ? '200' : '2048'),
+            'designation'     => 'nullable|string|max:100',
+            'employment_type' => 'nullable|string|max:100',
+            'valid_till'      => ['nullable', Rule::requiredIf($request->member_type === 'student'), 'date'],
+            'program'         => 'nullable|string|max:100',
+            'batch'           => 'nullable|string|max:20',
+            'zone'            => 'nullable|string|max:50',
+            'district'        => 'nullable|string|max:50',
+            'municipality'    => 'nullable|string|max:100',
+            'bus_route'       => 'nullable|string|max:100',
+            'bus_stop'        => 'nullable|string|max:100',
+            'has_bus_pass'    => 'boolean',
+            'library_id'      => 'nullable|string|max:50',
+            'has_library_card'=> 'boolean',
+            'create_learning_account' => 'boolean',
+            'learning_password' => ['nullable', 'confirmed', Password::min(8)],
+        ]);
+
+        if ($request->hasFile('photo')) {
+            $file      = $request->file('photo');
+            $ext       = $file->getClientOriginalExtension();
+            $filename  = $data['roll_number'] . '.' . $ext;
+            $destPath  = public_path('photos/' . $filename);
+            $file->move(public_path('photos'), $filename);
+            $this->resizeImage($destPath, 400);
+            $data['photo'] = "photos/{$filename}";
+        }
+
+        $data['has_bus_pass']     = $request->boolean('has_bus_pass');
+        $data['has_library_card'] = $request->boolean('has_library_card');
+
+        if ($data['has_library_card'] && empty($data['library_id'])) {
+            $data['library_id'] = 'LIB-' . strtoupper(substr($data['member_type'], 0, 3)) . '-' . str_pad(Student::count() + 1, 4, '0', STR_PAD_LEFT);
+        }
+
+        $createLearningAccount = $request->boolean('create_learning_account') && in_array($data['member_type'], ['student', 'teacher'], true);
+        $learningPassword = $request->input('learning_password');
+        unset($data['create_learning_account'], $data['learning_password']);
+
+        DB::transaction(function () use ($data, $createLearningAccount, $learningPassword) {
+            $student = Student::create($data);
+
+            if ($createLearningAccount) {
+                app(MemberAccountService::class)->sync($student, $learningPassword);
+            }
+        });
+
+        return redirect()->route('students.index')
+                         ->with('success', 'Member added successfully!');
+    }
+
+    public function show(Student $student)
+    {
+        $this->ensureStudentAccess($student);
+
+        return view('card.students.show', compact('student'));
+    }
+
+    public function edit(Student $student)
+    {
+        $this->ensureStudentAccess($student);
+
+        return view('card.students.create', [
+            'student' => $student,
+            'formOptions' => $this->buildFormOptions(),
+        ]);
+    }
+
+    public function update(Request $request, Student $student)
+    {
+        $this->ensureStudentAccess($student);
+
+        $data = $request->validate([
+            'organization'    => 'required|string|max:100',
+            'member_type'     => 'required|in:student,teacher,staff',
+            'stream'          => 'nullable|string|max:100',
+            'section'         => 'nullable|string|max:50',
+            'roll_number'     => [
+                'required',
+                Rule::unique('students')->ignore($student->id)->where(fn ($q) => $q
+                    ->where('organization', $request->organization)
+                    ->where('stream', $request->stream ?: null)
+                    ->where('section', $request->section ?: null)
+                ),
+            ],
+            'first_name'      => 'required|string|max:100',
+            'middle_name'     => 'nullable|string|max:100',
+            'last_name'       => 'required|string|max:100',
+            'guardian_name'   => 'nullable|string|max:150',
+            'registration_no' => 'nullable|string|max:100',
+            'dob'             => 'nullable|date',
+            'citizenship_no'  => 'nullable|string|max:50',
+            'mobile'          => 'nullable|string|max:20',
+            'email'           => 'nullable|email',
+            'photo'           => 'nullable|image|max:' . ($request->member_type === 'student' ? '200' : '2048'),
+            'designation'     => 'nullable|string|max:100',
+            'employment_type' => 'nullable|string|max:100',
+            'valid_till'      => ['nullable', Rule::requiredIf($request->member_type === 'student'), 'date'],
+            'program'         => 'nullable|string|max:100',
+            'batch'           => 'nullable|string|max:20',
+            'zone'            => 'nullable|string|max:50',
+            'district'        => 'nullable|string|max:50',
+            'municipality'    => 'nullable|string|max:100',
+            'bus_route'       => 'nullable|string|max:100',
+            'bus_stop'        => 'nullable|string|max:100',
+            'has_bus_pass'    => 'boolean',
+            'library_id'      => 'nullable|string|max:50',
+            'has_library_card'=> 'boolean',
+            'create_learning_account' => 'boolean',
+            'learning_password' => ['nullable', 'confirmed', Password::min(8)],
+        ]);
+
+        if ($request->hasFile('photo')) {
+            $file     = $request->file('photo');
+            $ext      = $file->getClientOriginalExtension();
+            $filename = $data['roll_number'] . '.' . $ext;
+            $destPath = public_path('photos/' . $filename);
+            $file->move(public_path('photos'), $filename);
+            $this->resizeImage($destPath, 400);
+            $data['photo'] = "photos/{$filename}";
+        }
+
+        $data['has_bus_pass']     = $request->boolean('has_bus_pass');
+        $data['has_library_card'] = $request->boolean('has_library_card');
+
+        $createLearningAccount = $request->boolean('create_learning_account') && in_array($data['member_type'], ['student', 'teacher'], true);
+        $learningPassword = $request->input('learning_password');
+        unset($data['create_learning_account'], $data['learning_password']);
+
+        DB::transaction(function () use ($student, $data, $createLearningAccount, $learningPassword) {
+            $student->update($data);
+
+            if ($createLearningAccount || $student->user_id) {
+                app(MemberAccountService::class)->sync($student->fresh(), $learningPassword);
+            }
+        });
+
+        return redirect()->route('students.index')
+                         ->with('success', 'Member updated successfully!');
+    }
+
+    public function bulkLearningAccounts(Request $request)
+    {
+        $data = $request->validate([
+            'ids' => ['required', 'array'],
+            'ids.*' => ['integer', 'exists:students,id'],
+            'learning_password' => ['required', 'confirmed', Password::min(8)],
+        ]);
+
+        $students = $this->scopedStudentsQuery($data['ids'])
+            ->whereIn('member_type', ['student', 'teacher'])
+            ->get();
+
+        $created = 0;
+
+        DB::transaction(function () use ($students, $data, &$created) {
+            foreach ($students as $student) {
+                app(MemberAccountService::class)->sync($student, $data['learning_password']);
+                $created++;
+            }
+        });
+
+        return back()->with('success', "Learning login enabled for {$created} student(s).");
+    }
+
+    public function destroy(Student $student)
+    {
+        $this->ensureStudentAccess($student);
+
+        $photoPath = $student->photo;
+        $student->delete();
+
+        $this->deleteStudentPhoto($photoPath);
+
+        return redirect()->route('students.index')
+                         ->with('success', 'Member deleted.');
+    }
+
+    // ── Autocomplete suggestions ──────────────────────────────────────────
+    public function suggestions(Request $request): JsonResponse
+    {
+        $allowed = ['program', 'stream', 'section', 'designation', 'employment_type', 'batch'];
+        $field   = $request->input('field');
+
+        if (!in_array($field, $allowed)) {
+            return response()->json([]);
+        }
+
+        $values = Student::whereNotNull($field)
+            ->where($field, '!=', '')
+            ->distinct()
+            ->orderBy($field)
+            ->pluck($field);
+
+        return response()->json($values);
+    }
+
+    public function formOptions(): JsonResponse
+    {
+        return response()->json($this->buildFormOptions());
+    }
+
+    // ── Bulk update valid_till ────────────────────────────────────────────
+    public function bulkValidTill(Request $request)
+    {
+        $request->validate([
+            'ids'        => 'required|array|min:1',
+            'ids.*'      => 'integer|exists:students,id',
+            'valid_till' => 'required|date',
+        ]);
+
+        $count = $this->scopedStudentsQuery($request->ids)
+            ->update(['valid_till' => $request->valid_till]);
+
+        return back()->with('success', "{$count} member(s) valid date updated.");
+    }
+
+    public function bulkDestroy(Request $request)
+    {
+        abort_unless(auth()->user()->isSuperAdmin(), 403);
+
+        $request->validate([
+            'ids'   => 'required|array|min:1',
+            'ids.*' => 'integer|exists:students,id',
+        ]);
+
+        $students = Student::whereIn('id', $request->ids)->get(['id', 'photo']);
+        $count = $students->count();
+
+        if ($count === 0) {
+            return back()->with('error', 'No members selected for deletion.');
+        }
+
+        Student::whereIn('id', $students->pluck('id'))->delete();
+
+        foreach ($students->pluck('photo')->filter()->unique() as $photoPath) {
+            $this->deleteStudentPhoto($photoPath);
+        }
+
+        return back()->with('success', "{$count} member(s) deleted successfully.");
+    }
+
+    protected function buildFormOptions(): array
+    {
+        $user = auth()->user();
+
+        if (Schema::hasTable('organizations') && Schema::hasTable('departments') && Schema::hasTable('sections')) {
+            $organizations = Organization::where('is_active', true)
+                ->when(!$user->isSuperAdmin(), fn($query) => $query->where('slug', $user->organizationSlug()))
+                ->with(['activeDepartments.activeSections'])
+                ->orderBy('name')
+                ->get();
+
+            return $organizations->mapWithKeys(fn($organization) => [
+                $organization->slug => [
+                    'label' => $organization->name,
+                    'streams' => $organization->activeDepartments
+                        ->when(!$user->isSuperAdmin() && $user->departmentName(), fn($departments) => $departments->where('name', $user->departmentName()))
+                        ->mapWithKeys(fn($department) => [
+                            $department->name => $department->activeSections->pluck('name')->values()->all(),
+                        ])
+                        ->all(),
+                ],
+            ])->all();
+        }
+
+        $students = Student::query()
+            ->select('organization', 'stream', 'section')
+            ->whereNotNull('organization')
+            ->where('organization', '!=', '')
+            ->whereNotNull('stream')
+            ->where('stream', '!=', '')
+            ->where('member_type', 'student')
+            ->orderBy('organization')
+            ->orderBy('stream')
+            ->orderBy('section')
+            ->tap(fn($query) => $user->applyStudentScope($query))
+            ->get();
+
+        return $students
+            ->groupBy('organization')
+            ->map(function (Collection $organizationStudents, string $organization) {
+                return [
+                    'label' => ucfirst($organization),
+                    'streams' => $organizationStudents
+                        ->groupBy('stream')
+                        ->map(fn(Collection $streamStudents) => $streamStudents
+                            ->pluck('section')
+                            ->filter()
+                            ->unique()
+                            ->values()
+                            ->all())
+                        ->all(),
+                ];
+            })
+            ->all();
+    }
+
+    private function resizeImage(string $path, int $maxDim): void
+    {
+        $info = @getimagesize($path);
+        if (!$info || ($info[0] <= $maxDim && $info[1] <= $maxDim)) return;
+
+        $ratio = min($maxDim / $info[0], $maxDim / $info[1]);
+        $newW  = (int) ($info[0] * $ratio);
+        $newH  = (int) ($info[1] * $ratio);
+
+        $src = match ($info[2]) {
+            IMAGETYPE_PNG  => imagecreatefrompng($path),
+            IMAGETYPE_JPEG => imagecreatefromjpeg($path),
+            IMAGETYPE_WEBP => imagecreatefromwebp($path),
+            default        => null,
+        };
+        if (!$src) return;
+
+        $dst = imagecreatetruecolor($newW, $newH);
+        if ($info[2] === IMAGETYPE_PNG) {
+            imagealphablending($dst, false);
+            imagesavealpha($dst, true);
+            imagefill($dst, 0, 0, imagecolorallocatealpha($dst, 0, 0, 0, 127));
+        }
+        imagecopyresampled($dst, $src, 0, 0, 0, 0, $newW, $newH, $info[0], $info[1]);
+
+        match ($info[2]) {
+            IMAGETYPE_PNG  => imagepng($dst, $path, 7),
+            default        => imagejpeg($dst, $path, 85),
+        };
+        imagedestroy($src);
+        imagedestroy($dst);
+    }
+}

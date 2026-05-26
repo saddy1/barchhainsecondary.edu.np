@@ -1,0 +1,260 @@
+@import "tailwindcss";
+
+@source "../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php";
+@source "../**/*.blade.php";
+@source "../**/*.js";
+
+@theme {
+  /* Barchhain Secondary School brand colors */
+  --color-barchhain-green: #1a5632;
+  --color-barchhain-green-light: #237042;
+  --color-barchhain-gold: #e2a024;
+  --color-barchhain-gold-light: #f4b63e;
+
+  --color-primary: var(--color-barchhain-green);
+  --color-secondary: var(--color-barchhain-gold);
+}
+
+@layer base {
+  *, *::before, *::after {
+    box-sizing: border-box;
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+    -webkit-tap-highlight-color: transparent;
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply antialiased text-gray-800;
+    background-color: var(--theme-body-bg, #fdfbf7);
+    background-image: var(--theme-body-gradient, none);
+    background-attachment: fixed;
+    overflow-x: hidden;
+    min-height: 100dvh;
+  }
+
+  img, svg {
+    vertical-align: middle;
+  }
+
+  /* Improve form controls on mobile */
+  input, select, textarea {
+    font-size: 16px; /* Prevent iOS zoom on focus */
+    -webkit-appearance: none;
+    appearance: none;
+  }
+
+  /* Better scrolling on touch devices */
+  .overflow-y-auto, .overflow-x-auto {
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+  }
+
+  /* Table responsiveness */
+  .table-responsive {
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-x: contain;
+  }
+
+  @media (max-width: 768px) {
+    .table-responsive table {
+      min-width: 600px;
+    }
+  }
+}
+
+@layer components {
+
+  /* ── Theme gradient utilities ── */
+  .theme-gradient-primary {
+    background: linear-gradient(135deg, var(--theme-primary, #1a5632) 0%, var(--theme-primary-light, #237042) 100%);
+  }
+
+  .theme-gradient-header {
+    background: linear-gradient(90deg, var(--theme-primary, #1a5632) 0%, var(--theme-header-gradient-end, #0f3d22) 100%);
+  }
+
+  .theme-gradient-footer {
+    background: linear-gradient(135deg, var(--theme-primary, #1a5632) 0%, var(--theme-footer-gradient-end, #0b2415) 100%);
+  }
+
+  .theme-gradient-sidebar {
+    background: linear-gradient(180deg, var(--theme-sidebar-bg, #0b2415) 0%, var(--theme-sidebar-gradient-end, #050f09) 100%);
+  }
+
+  .theme-gradient-notice {
+    background: linear-gradient(90deg, var(--theme-notice-bg, #1a5632) 0%, var(--theme-primary, #1a5632) 100%);
+  }
+
+  .theme-gradient-card {
+    background: linear-gradient(135deg, var(--theme-primary, #1a5632) 0%, var(--theme-primary-light, #237042) 100%);
+  }
+
+  .theme-gradient-accent {
+    background: linear-gradient(135deg, var(--theme-secondary, #e2a024) 0%, var(--theme-secondary-light, #f4b63e) 100%);
+  }
+
+  /* ── Mobile-friendly card ── */
+  .erp-card {
+    @apply bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden;
+  }
+
+  @media (max-width: 640px) {
+    .erp-card {
+      @apply rounded-xl;
+    }
+  }
+
+  /* ── Responsive table wrapper ── */
+  .table-wrap {
+    @apply w-full overflow-x-auto rounded-2xl border border-gray-100;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .table-wrap table {
+    @apply w-full;
+    min-width: 560px;
+  }
+
+  /* ── Better mobile form layout ── */
+  .form-grid {
+    @apply grid gap-4;
+    grid-template-columns: 1fr;
+  }
+
+  @media (min-width: 640px) {
+    .form-grid-2 { grid-template-columns: repeat(2, 1fr); }
+    .form-grid-3 { grid-template-columns: repeat(3, 1fr); }
+  }
+
+  /* ── Sticky header safe-area support (iOS notch) ── */
+  .safe-top {
+    padding-top: env(safe-area-inset-top, 0px);
+  }
+
+  .safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  /* ── Admin stats card gradient ── */
+  .stat-card {
+    @apply relative overflow-hidden rounded-2xl p-5 text-white;
+    background: linear-gradient(135deg, var(--theme-primary, #1a5632) 0%, var(--theme-primary-light, #237042) 100%);
+  }
+
+  .stat-card-accent {
+    background: linear-gradient(135deg, var(--theme-secondary, #e2a024) 0%, var(--theme-secondary-light, #f4b63e) 100%);
+    @apply text-white;
+  }
+
+  /* ── Ticker animations ── */
+  @keyframes ticker-scroll {
+    0%   { transform: translateX(0); }
+    100% { transform: translateX(-50%); }
+  }
+
+  .ticker-wrapper {
+    display: flex;
+    width: max-content;
+    animation: ticker-scroll 40s linear infinite;
+  }
+
+  .ticker-wrapper:hover { animation-play-state: paused; }
+
+  .ticker-track { display: flex; align-items: center; }
+
+  @keyframes admin-ticker {
+    0%   { transform: translateX(100%); }
+    100% { transform: translateX(-100%); }
+  }
+
+  .admin-notice-ticker {
+    animation: admin-ticker 32s linear infinite;
+    white-space: nowrap;
+  }
+
+  .admin-notice-ticker:hover { animation-play-state: paused; }
+
+  /* ── Mobile drawer overlay ── */
+  .drawer-overlay {
+    @apply fixed inset-0 z-40 bg-black/60 backdrop-blur-sm;
+  }
+
+  /* ── Touch-friendly list items ── */
+  .touch-item {
+    @apply flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all;
+    min-height: 52px;
+  }
+
+  /* ── Responsive section padding ── */
+  .section-pad {
+    @apply px-4 sm:px-6 lg:px-8 py-10 sm:py-14 lg:py-20;
+  }
+
+  /* ── Text clamping utilities ── */
+  .line-clamp-1 { overflow: hidden; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 1; }
+  .line-clamp-2 { overflow: hidden; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+  .line-clamp-3 { overflow: hidden; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; }
+
+  /* ── Sidebar scrollbar ── */
+  .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+  .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    background: var(--theme-primary, #1a5632);
+    border-radius: 4px;
+  }
+}
+
+@layer utilities {
+
+  /* ── Gradient text ── */
+  .text-gradient-primary {
+    background: linear-gradient(135deg, var(--theme-primary, #1a5632), var(--theme-primary-light, #237042));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .text-gradient-accent {
+    background: linear-gradient(135deg, var(--theme-secondary, #e2a024), var(--theme-secondary-light, #f4b63e));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  /* ── Full-width on mobile ── */
+  .mobile-full { @apply w-full sm:w-auto; }
+
+  /* ── Safe-area utilities ── */
+  .pb-safe { padding-bottom: max(1rem, env(safe-area-inset-bottom)); }
+  .pt-safe { padding-top: max(0px, env(safe-area-inset-top)); }
+
+  /* ── Backdrop blur support ── */
+  .glass {
+    background: rgba(255, 255, 255, 0.85);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+  }
+
+  .glass-dark {
+    background: rgba(11, 36, 21, 0.85);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+  }
+
+  /* ── Focus visible for accessibility ── */
+  .focus-ring:focus-visible {
+    outline: 2px solid var(--theme-primary, #1a5632);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+
+  /* ── Smooth color transitions ── */
+  .theme-transition {
+    transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+  }
+}

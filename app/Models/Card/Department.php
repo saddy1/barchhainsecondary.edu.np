@@ -1,0 +1,26 @@
+<?php
+
+namespace App\Models\Card;
+
+use Illuminate\Database\Eloquent\Model;
+
+class Department extends Model
+{
+    protected $fillable = ['organization_id', 'name', 'university', 'university_college', 'university_logo', 'is_active'];
+    protected $casts = ['is_active' => 'boolean'];
+
+    public function organization()
+    {
+        return $this->belongsTo(Organization::class);
+    }
+
+    public function sections()
+    {
+        return $this->hasMany(Section::class)->orderBy('name');
+    }
+
+    public function activeSections()
+    {
+        return $this->sections()->where('is_active', true);
+    }
+}
