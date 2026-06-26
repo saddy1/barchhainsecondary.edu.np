@@ -1,8 +1,8 @@
 {{-- resources/views/pages/events.blade.php --}}
 @extends('layouts.app')
 
-@section('title', 'Events & Activities — Barchhain Secondary School | Barchhain, Doti')
-@section('meta_description', 'View upcoming and past events at Barchhain Secondary School. Sports day, cultural programs, science exhibitions, parent-teacher meetings, and more.')
+@section('title', 'Events & Activities')
+@section('meta_description', 'View upcoming and past events at our school. Sports day, cultural programs, science exhibitions, parent-teacher meetings, and more.')
 
 @section('content')
 

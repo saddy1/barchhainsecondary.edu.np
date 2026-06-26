@@ -33,128 +33,64 @@
 {{-- ============================================================ --}}
 {{-- EVENTS SECTION (Upcoming Split + Past Grid) --}}
 {{-- ============================================================ --}}
-<section class="py-12 md:py-20 bg-[#fdfbf7] border-b border-gray-200">
+<section class="py-8 md:py-10 bg-[#fdfbf7] border-b border-gray-200">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
 
         {{-- Header --}}
-        <div class="flex items-end justify-between mb-6 md:mb-8">
+        <div class="flex items-end justify-between mb-4">
             <div>
                 <p class="text-[#e2a024] font-bold text-xs uppercase tracking-widest mb-1 flex items-center gap-2">
                     <span class="w-4 h-0.5 bg-[#e2a024]"></span> Calendar
                 </p>
-                <h2 class="text-2xl md:text-3xl font-bold text-[#0b2415]">{{ __('site.news.events_h2') }}</h2>
+                <h2 class="text-xl md:text-2xl font-bold text-[#0b2415]">{{ __('site.news.events_h2') }}</h2>
             </div>
-            <a href="#" class="hidden sm:inline-flex items-center gap-1 text-xs font-bold text-[#1a5632] hover:text-[#e2a024] transition-colors bg-green-50 px-3 py-1.5 rounded-lg">
-                View Calendar <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-width="2" d="M9 5l7 7-7 7"/></svg>
-            </a>
         </div>
 
-        {{-- UPCOMING EVENTS --}}
         @if($upcomingEvents->isNotEmpty())
-            @php
-                $featuredEvent = $upcomingEvents->first();
-                $otherEvents = $upcomingEvents->skip(1)->take(4);
-                $featDate = $featuredEvent->event_date ? \Carbon\Carbon::parse($featuredEvent->event_date) : null;
-                $featImg = str_starts_with($featuredEvent->featured_image ?? '', 'http') ? $featuredEvent->featured_image : asset($featuredEvent->featured_image);
-            @endphp
-
-            <div class="grid lg:grid-cols-12 gap-4 lg:gap-6 items-stretch">
-                
-                {{-- Featured Event (Left) --}}
-                <div class="lg:col-span-5 h-[300px] lg:h-[420px]">
-                    <a href="{{ route('notices.show', $featuredEvent->slug) }}" class="group block relative w-full h-full rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-all border border-gray-100">
-                        
-                        @if($featuredEvent->featured_image)
-                            <img src="{{ $featImg }}" alt="{{ $featuredEvent->title }}" class="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-700">
-                        @else
-                            <div class="absolute inset-0 bg-[#1a5632] flex items-center justify-center">
-                                <svg class="w-16 h-16 text-white/20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-width="1.5" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
-                            </div>
-                        @endif
-                        
-                        <div class="absolute inset-0 bg-gradient-to-t from-[#0b2415] via-[#0b2415]/50 to-transparent"></div>
-
-                        @if($featDate)
-                        <div class="absolute top-4 left-4 bg-white/95 backdrop-blur-md text-center px-3 py-1.5 rounded-lg shadow-sm">
-                            <span class="block text-xl font-black text-[#0b2415] leading-none">{{ $featDate->format('d') }}</span>
-                            <span class="block text-[9px] font-bold uppercase tracking-widest text-[#1a5632]">{{ $featDate->format('M Y') }}</span>
+            <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                @foreach($upcomingEvents as $event)
+                    @php $date = $event->event_date ? \Carbon\Carbon::parse($event->event_date) : null; @endphp
+                    <a href="{{ route('notices.show', $event->slug) }}" class="group flex items-center gap-3 rounded-xl border border-gray-100 bg-white p-3 shadow-sm transition-colors hover:border-[#1a5632]/40">
+                        <div class="flex h-12 w-12 shrink-0 flex-col items-center justify-center rounded-lg bg-[#1a5632] text-white">
+                            <span class="text-base font-black leading-none">{{ $date ? $date->format('d') : '-' }}</span>
+                            <span class="mt-0.5 text-[8px] font-bold uppercase tracking-widest text-green-100">{{ $date ? $date->format('M') : 'TBA' }}</span>
                         </div>
-                        @endif
-
-                        <div class="absolute bottom-0 left-0 w-full p-4 sm:p-6">
-                            <span class="inline-block text-[9px] font-bold uppercase tracking-widest bg-[#e2a024] text-[#0b2415] px-2 py-0.5 rounded mb-2">
-                                {{ $featuredEvent->category ?? 'Event' }}
-                            </span>
-                            <h3 class="text-xl sm:text-2xl font-bold text-white mb-2 leading-tight group-hover:text-[#e2a024] transition-colors line-clamp-2">
-                                {{ $featuredEvent->title }}
-                            </h3>
-                            <div class="flex flex-wrap gap-x-3 gap-y-1 text-xs text-green-50/80 font-medium">
-                                <span class="flex items-center gap-1"><svg class="w-3 h-3 text-[#e2a024]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg> {{ $featuredEvent->event_time ?? 'TBA' }}</span>
-                                <span class="flex items-center gap-1"><svg class="w-3 h-3 text-[#e2a024]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/></svg> {{ $featuredEvent->event_location ?? 'Campus' }}</span>
+                        <div class="min-w-0 flex-1">
+                            <div class="mb-1 flex items-center gap-2 text-[10px] font-bold text-gray-500">
+                                <span class="rounded bg-green-50 px-1.5 py-0.5 text-[#1a5632]">{{ $event->category ?: 'Event' }}</span>
+                                <span class="truncate">{{ $event->event_time ?? 'TBA' }}</span>
                             </div>
+                            <h3 class="truncate text-sm font-black text-[#0b2415] group-hover:text-[#1a5632]">{{ $event->title }}</h3>
+                            <p class="mt-1 truncate text-xs text-gray-500">{{ $event->event_location ?: 'School Campus' }}</p>
                         </div>
                     </a>
-                </div>
-
-                {{-- Compact List (Right) --}}
-                <div class="lg:col-span-7 flex flex-col gap-3">
-                    @forelse($otherEvents as $event)
-                        @php
-                            $date = $event->event_date ? \Carbon\Carbon::parse($event->event_date) : null;
-                        @endphp
-                        <a href="{{ route('notices.show', $event->slug) }}" class="group flex items-center gap-3 sm:gap-4 p-3 bg-white rounded-xl shadow-sm border border-gray-100 hover:border-[#1a5632]/40 transition-colors">
-                            <div class="shrink-0 w-12 h-12 sm:w-14 sm:h-14 rounded-lg bg-gray-50 border border-gray-100 flex flex-col items-center justify-center group-hover:bg-[#1a5632] transition-colors">
-                                <span class="text-lg font-black text-[#0b2415] leading-none group-hover:text-white">{{ $date ? $date->format('d') : '-' }}</span>
-                                <span class="text-[8px] font-bold uppercase tracking-widest text-gray-500 group-hover:text-green-200 mt-0.5">{{ $date ? $date->format('M') : 'TBA' }}</span>
-                            </div>
-                            <div class="flex-1 min-w-0">
-                                <h4 class="text-sm sm:text-base font-bold text-[#0b2415] truncate group-hover:text-[#1a5632] transition-colors">{{ $event->title }}</h4>
-                                <div class="flex items-center gap-2 text-[10px] sm:text-xs text-gray-500 font-medium mt-1 truncate">
-                                    <span class="bg-gray-100 px-1.5 py-0.5 rounded">{{ $event->category }}</span>
-                                    <span>• {{ $event->event_time ?? 'TBA' }}</span>
-                                </div>
-                            </div>
-                            <svg class="hidden sm:block w-4 h-4 text-gray-300 group-hover:text-[#e2a024] shrink-0 mr-1" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
-                        </a>
-                    @empty
-                        <div class="flex-1 flex flex-col items-center justify-center p-6 bg-white rounded-xl border border-dashed border-gray-200">
-                            <span class="text-2xl mb-1">🎉</span>
-                            <p class="text-gray-500 text-xs font-medium">No more upcoming events right now.</p>
-                        </div>
-                    @endforelse
-                    
-                    <a href="#" class="sm:hidden mt-2 text-center w-full py-2 bg-white border border-gray-200 text-[#0b2415] font-bold text-xs rounded-lg shadow-sm">View Calendar &rarr;</a>
-                </div>
+                @endforeach
             </div>
         @else
-            <div class="text-center py-10 bg-white border border-gray-100 rounded-2xl shadow-sm">
-                <div class="text-3xl mb-2">📅</div>
+            <div class="rounded-xl border border-dashed border-gray-200 bg-white py-8 text-center">
                 <h3 class="text-base font-bold text-gray-800">{{ __('site.news.no_events') }}</h3>
                 <p class="text-gray-500 text-xs">Check back later for new schedules.</p>
             </div>
         @endif
 
-        {{-- PAST EVENTS / HIGHLIGHTS (Dense Grid) --}}
         @if($pastEvents->isNotEmpty())
-        <div class="mt-10 pt-8 border-t border-gray-200/60">
-            <h3 class="text-lg md:text-xl font-bold text-[#0b2415] mb-4">Recent Highlights</h3>
+        <div class="mt-6 border-t border-gray-200/70 pt-5">
+            <h3 class="mb-3 text-base font-black text-[#0b2415]">Recent Highlights</h3>
             
-            <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
+            <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
                 @foreach($pastEvents as $past)
-                    @php
-                        $pastDate = $past->event_date ? \Carbon\Carbon::parse($past->event_date) : null;
-                        $pastImg = str_starts_with($past->featured_image ?? '', 'http') ? $past->featured_image : asset($past->featured_image);
-                    @endphp
-                    <a href="{{ route('notices.show', $past->slug) }}" class="group block bg-white rounded-xl border border-gray-100 overflow-hidden hover:shadow-md transition-all">
-                        <div class="h-24 sm:h-28 overflow-hidden relative bg-gray-100">
-                            @if($past->featured_image)
-                                <img src="{{ $pastImg }}" alt="{{ $past->title }}" class="w-full h-full object-cover grayscale-[30%] group-hover:grayscale-0 group-hover:scale-105 transition-all duration-300">
-                            @endif
-                            <div class="absolute top-2 left-2 bg-black/60 backdrop-blur-sm px-1.5 py-0.5 rounded text-[8px] font-bold uppercase tracking-widest text-white">Past</div>
+                    @php $pastDate = $past->event_date ? \Carbon\Carbon::parse($past->event_date) : null; @endphp
+                    <a href="{{ route('notices.show', $past->slug) }}" class="group flex items-center gap-3 rounded-xl border border-gray-100 bg-white p-3 transition-colors hover:border-[#1a5632]/30 hover:bg-green-50/30">
+                        <div class="flex h-11 w-11 shrink-0 flex-col items-center justify-center rounded-lg border border-gray-200 bg-gray-50 text-center">
+                            <span class="text-sm font-black leading-none text-[#0b2415]">{{ $pastDate ? $pastDate->format('d') : '-' }}</span>
+                            <span class="mt-0.5 text-[8px] font-bold uppercase tracking-widest text-gray-500">{{ $pastDate ? $pastDate->format('M') : 'Past' }}</span>
                         </div>
-                        <div class="p-3">
-                            <p class="text-[10px] font-bold text-gray-400 mb-0.5">{{ $pastDate ? $pastDate->format('M d, Y') : '' }}</p>
-                            <h4 class="text-xs sm:text-sm font-bold text-[#0b2415] group-hover:text-[#1a5632] line-clamp-2 leading-tight">{{ $past->title }}</h4>
+                        <div class="min-w-0 flex-1">
+                            <div class="mb-1 flex items-center gap-2 text-[10px] font-bold text-gray-500">
+                                <span class="rounded bg-gray-100 px-1.5 py-0.5">{{ $past->category ?: 'Event' }}</span>
+                                <span>{{ $pastDate ? $pastDate->format('Y') : '' }}</span>
+                            </div>
+                            <h4 class="truncate text-sm font-bold text-[#0b2415] group-hover:text-[#1a5632]">{{ $past->title }}</h4>
                         </div>
                     </a>
                 @endforeach
@@ -165,96 +101,78 @@
 </section>
 
 {{-- ============================================================ --}}
-{{-- COMPACT NOTICE BOARD --}}
+{{-- NEWS / NOTICE BOARD --}}
 {{-- ============================================================ --}}
-<section id="notice-board" class="py-12 md:py-20 bg-white relative scroll-mt-24">
-    <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8" x-data="{ activeCategory: 'All' }">
+<section id="notice-board" class="py-8 md:py-10 bg-white relative scroll-mt-24">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
 
-        <div class="flex flex-col sm:flex-row sm:items-end justify-between mb-6 md:mb-8">
-            <div>
-                <h2 class="text-2xl md:text-3xl font-bold text-[#0b2415]">Notice Board</h2>
-                <div class="w-12 h-1 bg-[#1a5632] mt-2 rounded-full"></div>
+        <div class="mb-5 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+            <div class="max-w-2xl">
+                <p class="mb-2 text-xs font-black uppercase tracking-[.22em] text-[#1a5632]">Updates</p>
+                <h2 class="text-xl md:text-2xl font-black text-[#0b2415]">News, notices, results and resources</h2>
             </div>
+            <a href="{{ route('notices') }}" class="inline-flex w-full items-center justify-center rounded-lg border border-[#1a5632]/20 px-4 py-2 text-sm font-bold text-[#1a5632] hover:bg-green-50 sm:w-auto">
+                Notice Archive
+                <svg class="ml-2 h-4 w-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M17 8l4 4m0 0l-4 4m4-4H3"/></svg>
+            </a>
         </div>
 
-        {{-- Compact Filters --}}
-        <div class="flex flex-wrap items-center gap-2 mb-6">
-            <button @click="activeCategory = 'All'"
-                    :class="activeCategory === 'All' ? 'bg-[#1a5632] text-white border-[#1a5632]' : 'bg-gray-50 text-gray-600 hover:bg-green-50 border-gray-200'"
-                    class="text-xs font-bold px-4 py-1.5 rounded-full border transition-colors">
+        {{-- Filters --}}
+        <div class="mb-5 flex flex-wrap items-center gap-2 rounded-xl border border-gray-100 bg-[#f7faf8] p-2.5">
+            <a href="{{ route('news', ['category' => 'All']) }}"
+                    class="text-xs font-bold px-3.5 py-1.5 rounded-full border transition-colors {{ ($category ?? 'All') === 'All' ? 'bg-[#1a5632] text-white border-[#1a5632]' : 'bg-white text-gray-600 hover:bg-green-50 border-gray-200' }}">
                 All
-            </button>
-            @foreach($noticeCategories as $category)
-            <button @click="activeCategory = '{{ $category }}'"
-                    :class="activeCategory === '{{ $category }}' ? 'bg-[#1a5632] text-white border-[#1a5632]' : 'bg-gray-50 text-gray-600 hover:bg-green-50 border-gray-200'"
-                    class="text-xs font-bold px-4 py-1.5 rounded-full border transition-colors">
-                {{ $category }}
-            </button>
+            </a>
+            @foreach($noticeCategories as $noticeCategory)
+            <a href="{{ route('news', ['category' => $noticeCategory]) }}"
+                    class="text-xs font-bold px-3.5 py-1.5 rounded-full border transition-colors {{ ($category ?? 'All') === $noticeCategory ? 'bg-[#1a5632] text-white border-[#1a5632]' : 'bg-white text-gray-600 hover:bg-green-50 border-gray-200' }}">
+                {{ $noticeCategory }}
+            </a>
             @endforeach
         </div>
 
-        {{-- Dense Notice List --}}
-        <div class="flex flex-col gap-2.5 min-h-[300px]">
+        {{-- Two Column List --}}
+        <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
             @forelse($notices as $notice)
+            @php
+                $noticeDate = $notice->created_at;
+            @endphp
             <a href="{{ route('notices.show', $notice->slug) }}"
-                x-show="activeCategory === 'All' || activeCategory === '{{ $notice->category }}'"
-                x-transition:enter="transition ease-out duration-200"
-                x-transition:enter-start="opacity-0 translate-y-2"
-                x-transition:enter-end="opacity-100 translate-y-0"
-                class="group flex items-center gap-3 sm:gap-4 bg-[#fdfbf7] p-3 rounded-xl border border-gray-100 hover:border-[#1a5632]/40 hover:shadow-sm transition-all"
+                class="group flex items-center gap-3 rounded-xl border border-gray-100 bg-white p-3 shadow-sm transition-colors hover:border-[#1a5632]/40 hover:bg-green-50/30"
             >
-                {{-- Tiny Date Box --}}
-                <div class="shrink-0 flex flex-col items-center justify-center w-12 h-12 bg-white rounded-lg border border-gray-200 shadow-sm group-hover:bg-[#1a5632] group-hover:border-[#1a5632] transition-colors">
-                    <span class="text-sm font-black text-[#0b2415] leading-none group-hover:text-white">{{ $notice->created_at->format('d') }}</span>
-                    <span class="text-[8px] font-bold uppercase tracking-widest text-gray-500 group-hover:text-green-200 mt-0.5">{{ $notice->created_at->format('M') }}</span>
+                <div class="flex h-12 w-12 shrink-0 flex-col items-center justify-center rounded-lg border border-gray-200 bg-[#f7faf8] text-center group-hover:border-[#1a5632]/30">
+                    <span class="text-base font-black leading-none text-[#0b2415]">{{ $noticeDate->format('d') }}</span>
+                    <span class="mt-0.5 text-[8px] font-black uppercase tracking-widest text-[#1a5632]">{{ $noticeDate->format('M') }}</span>
                 </div>
 
-                {{-- Content Block --}}
-                <div class="flex-1 min-w-0">
-                    <div class="flex items-center gap-2 mb-0.5">
-                        <span class="text-[8px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-gray-200/50 text-gray-600">
-                            {{ $notice->category }}
-                        </span>
-                        <span class="text-[10px] text-gray-400 font-medium hidden sm:inline-block">
-                            {{ $notice->created_at->diffForHumans() }}
-                        </span>
+                <div class="min-w-0 flex-1">
+                    <div class="mb-1 flex items-center gap-2">
+                        <span class="rounded bg-[#1a5632]/10 px-1.5 py-0.5 text-[10px] font-black uppercase tracking-wider text-[#1a5632]">{{ $notice->category ?: 'General' }}</span>
+                        <span class="hidden text-[10px] font-semibold text-gray-400 sm:inline">{{ $noticeDate->diffForHumans() }}</span>
                     </div>
-                    <h3 class="text-sm sm:text-base font-bold text-[#0b2415] truncate group-hover:text-[#1a5632] transition-colors">
+                    <h3 class="truncate text-sm font-black text-[#0b2415] transition-colors group-hover:text-[#1a5632]">
                         {{ $notice->title }}
                     </h3>
-                    {{-- Hidden on very small screens to save space --}}
-                    <p class="hidden sm:block text-gray-500 text-xs truncate mt-0.5">
-                        {{ Str::limit(strip_tags($notice->content), 80) }}
+                    <p class="mt-1 line-clamp-1 text-xs text-gray-500">
+                        {{ $notice->excerpt ?: Str::limit(strip_tags($notice->content), 90) }}
                     </p>
                 </div>
-                
-                {{-- Arrow --}}
-                <div class="shrink-0 text-gray-300 group-hover:text-[#1a5632] transition-colors px-2">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
-                </div>
+                <svg class="h-4 w-4 shrink-0 text-gray-300 group-hover:text-[#1a5632]" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
             </a>
             @empty
-            <div class="text-center py-10 bg-white rounded-xl border border-dashed border-gray-200">
-                <span class="text-2xl mb-2 block">📭</span>
-                <p class="text-gray-500 text-xs font-bold">No official notices published.</p>
+            <div class="md:col-span-2 rounded-xl border border-dashed border-gray-200 bg-[#f7faf8] py-10 text-center">
+                <svg class="mx-auto mb-3 h-10 w-10 text-gray-300" fill="none" stroke="currentColor" stroke-width="1.7" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7h8M8 11h8M8 15h5M6 3h9l3 3v15H6V3z"/></svg>
+                <p class="text-sm font-bold text-gray-500">No posts found for this category.</p>
             </div>
             @endforelse
             
-            {{-- Empty State for Alpine --}}
-            <div x-show="activeCategory !== 'All' && !{{ $noticeCategories->toJson() }}.includes(activeCategory)" style="display: none;" class="text-center py-10 bg-[#fdfbf7] rounded-xl border border-dashed border-gray-200">
-                <span class="text-2xl mb-2 block">📭</span>
-                <p class="text-gray-500 text-xs font-bold">No notices in this category.</p>
-            </div>
         </div>
 
         {{-- Actions --}}
-        <div class="mt-8 flex flex-col sm:flex-row items-center justify-between gap-4">
+        <div class="mt-8 flex flex-col items-center justify-between gap-4 sm:flex-row">
             <div class="w-full sm:w-auto overflow-x-auto">
                 {{ $notices->links('pagination::tailwind') }}
             </div>
-            <a href="#" class="w-full sm:w-auto text-center px-5 py-2 bg-white border border-gray-200 text-[#0b2415] font-bold text-xs rounded-lg hover:bg-gray-50 shadow-sm transition-colors">
-                View Notice Archive &rarr;
-            </a>
         </div>
         
     </div>

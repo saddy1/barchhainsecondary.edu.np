@@ -74,12 +74,12 @@
 
                     @foreach($categories ?? ['Leadership', 'Education', 'Management', 'Technical', 'Basic Level'] as $cat)
                     <button
-                        @click="activeCategory = '{{ $cat }}'"
-                        :class="activeCategory === '{{ $cat }}'
+                        @click="activeCategory = @js($cat)"
+                        :class="activeCategory === @js($cat)
                             ? 'bg-[#1a5632] text-white border-[#1a5632]'
                             : 'bg-white text-gray-600 border-gray-200 hover:border-[#1a5632] hover:text-[#1a5632]'"
                         class="dir-filter-btn shadow-sm"
-                        :aria-pressed="activeCategory === '{{ $cat }}'">
+                        :aria-pressed="activeCategory === @js($cat)">
                         {{ $cat }}
                     </button>
                     @endforeach
@@ -112,80 +112,74 @@
             </div>
         </div>
 
-        {{-- ── True CSS Grid ── --}}
-        <div id="dir-grid"
-             class="grid gap-6 transition-all duration-300"
-             :class="{
-                 'grid-cols-1 max-w-2xl mx-auto': gridLayout === 1,
-                 'grid-cols-1 sm:grid-cols-2 max-w-4xl mx-auto': gridLayout === 2,
-                 'grid-cols-1 sm:grid-cols-2 md:grid-cols-3 max-w-6xl mx-auto': gridLayout === 3,
-                 'grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4': gridLayout === 4
-             }">
-
-       @forelse($faculties ?? [] as $i => $member)
-            <div x-show="activeCategory === 'All' || activeCategory === '{{ $member->category ?? 'Leadership' }}'"
-                 x-transition:enter="dir-enter-transition"
-                 x-transition:enter-start="dir-enter-start"
-                 x-transition:enter-end="dir-enter-end"
-                 x-transition:leave="dir-leave-transition"
-                 x-transition:leave-start="dir-leave-start"
-                 x-transition:leave-end="dir-leave-end"
-                 class="bg-white rounded-3xl overflow-hidden border border-gray-100 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group flex"
-                 :class="gridLayout === 1 ? 'flex-col sm:flex-row items-stretch' : 'flex-col'">
-
-                {{-- INCREASED IMAGE HEIGHT: Changed from aspect-[3/2] to aspect-4/3 --}}
-                <div class="relative bg-gray-50 shrink-0 border-b border-gray-100"
-                     :class="gridLayout === 1 ? 'w-full sm:w-1/3 aspect-4/3 sm:aspect-auto sm:min-h-full' : 'w-full aspect-4/3'">
-                    
-                    {{-- object-top ensures heads aren't cut off --}}
-                    <img src="{{ asset($member->image ?? 'assets/image/placeholder.jpg') }}"
-                         alt="{{ $member->name ?? 'Name' }}"
-                         loading="lazy"
-                         class="absolute inset-0 w-full h-full object-cover object-top group-hover:scale-105 transition-transform duration-500 ease-out">
-
-                    {{-- Floating White Badge --}}
-                    <div class="absolute top-4 right-4">
-                        <span class="text-[10px] font-bold uppercase tracking-widest px-3 py-1.5 rounded-lg bg-[#0b2415]/80 backdrop-blur-sm text-white shadow-sm">
-                            {{ $member->category ?? 'Leadership' }}
-                        </span>
+        <div class="space-y-14">
+            @forelse($groups ?? [] as $group)
+                <section x-show="activeCategory === 'All' || activeCategory === @js($group->name)"
+                         x-transition:enter="dir-enter-transition"
+                         x-transition:enter-start="dir-enter-start"
+                         x-transition:enter-end="dir-enter-end"
+                         x-transition:leave="dir-leave-transition"
+                         x-transition:leave-start="dir-leave-start"
+                         x-transition:leave-end="dir-leave-end">
+                    <div class="mb-6">
+                        <h3 class="text-xl sm:text-2xl font-bold text-[#0b2415]">{{ $group->name }}</h3>
+                        @if($group->description)
+                            <p class="text-gray-600 text-sm mt-2 max-w-3xl">{{ $group->description }}</p>
+                        @endif
                     </div>
-                </div>
 
-                {{-- Content Area --}}
-                <div class="p-6 flex flex-col flex-1"
-                     :class="gridLayout === 1 ? 'justify-center items-start text-left' : 'items-start text-left'">
+                    <div class="grid gap-6 transition-all duration-300"
+                         :class="{
+                             'grid-cols-1 max-w-2xl': gridLayout === 1,
+                             'grid-cols-1 sm:grid-cols-2 max-w-4xl': gridLayout === 2,
+                             'grid-cols-1 sm:grid-cols-2 md:grid-cols-3 max-w-6xl': gridLayout === 3,
+                             'grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4': gridLayout === 4
+                         }">
+                        @foreach($group->activeMembers as $member)
+                            <div class="bg-white rounded-3xl overflow-hidden border border-gray-100 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group flex"
+                                 :class="gridLayout === 1 ? 'flex-col sm:flex-row items-stretch' : 'flex-col'">
+                                <div class="relative bg-gray-50 shrink-0 border-b border-gray-100"
+                                     :class="gridLayout === 1 ? 'w-full sm:w-1/3 aspect-4/3 sm:aspect-auto sm:min-h-full' : 'w-full aspect-4/3'">
+                                    <img src="{{ $member->image_url }}"
+                                         alt="{{ $member->name ?? 'Name' }}"
+                                         loading="lazy"
+                                         class="absolute inset-0 w-full h-full object-cover object-top group-hover:scale-105 transition-transform duration-500 ease-out">
 
-                    <h3 class="text-[19px] font-bold text-[#0b2415] mb-1 leading-tight group-hover:text-[#1a5632] transition-colors">
-                        {{ $member->name ?? 'Full Name' }}
-                    </h3>
+                                    <div class="absolute top-4 right-4">
+                                        <span class="text-[10px] font-bold uppercase tracking-widest px-3 py-1.5 rounded-lg bg-[#0b2415]/80 backdrop-blur-sm text-white shadow-sm">
+                                            {{ $group->name }}
+                                        </span>
+                                    </div>
+                                </div>
 
-                    <p class="text-sm font-medium text-gray-600 mb-4">
-                        {{ $member->role ?? 'Position' }}
-                    </p>
+                                <div class="p-6 flex flex-col flex-1"
+                                     :class="gridLayout === 1 ? 'justify-center items-start text-left' : 'items-start text-left'">
+                                    <h3 class="text-[19px] font-bold text-[#0b2415] mb-1 leading-tight group-hover:text-[#1a5632] transition-colors">
+                                        {{ $member->name ?? 'Full Name' }}
+                                    </h3>
 
-                    <div class="w-full h-px bg-gray-100 mb-4 mt-auto"></div>
+                                    <p class="text-sm font-medium text-gray-600 mb-4">
+                                        {{ $member->role ?? 'Position' }}
+                                    </p>
 
-                    <div class="flex flex-col gap-1 text-gray-500 text-xs font-medium w-full">
-                        <span class="font-bold text-[#0b2415] mb-0.5">{{ __('site.faculty.education_label') }}</span>
-                        <span>{{ $member->education ?? 'University Degree, Specialization' }}</span>
+                                    <div class="w-full h-px bg-gray-100 mb-4 mt-auto"></div>
+
+                                    <div class="flex flex-col gap-1 text-gray-500 text-xs font-medium w-full">
+                                        <span class="font-bold text-[#0b2415] mb-0.5">{{ __('site.faculty.education_label') }}</span>
+                                        <span>{{ $member->education ?? 'University Degree, Specialization' }}</span>
+                                    </div>
+                                </div>
+                            </div>
+                        @endforeach
                     </div>
-                </div>
-            </div>
+                </section>
             @empty
-            <div class="col-span-full flex flex-col items-center justify-center py-20 bg-white border border-gray-100 rounded-3xl shadow-sm">
-                <svg class="w-12 h-12 text-gray-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
-                <p class="text-gray-500 font-medium text-lg">{{ __('site.faculty.empty_title') }}</p>
-            </div>
+                <div class="flex flex-col items-center justify-center py-20 bg-white border border-gray-100 rounded-3xl shadow-sm">
+                    <svg class="w-12 h-12 text-gray-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
+                    <p class="text-gray-500 font-medium text-lg">{{ __('site.faculty.empty_title') }}</p>
+                </div>
             @endforelse
-
         </div>
-
-        {{-- Add Pagination Links --}}
-        @if(isset($faculties) && method_exists($faculties, 'links'))
-        <div class="mt-12 flex justify-center">
-            {{ $faculties->links('pagination::tailwind') }}
-        </div>
-        @endif
 
     </div>
 </section>

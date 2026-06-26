@@ -2,7 +2,7 @@
 
 @section('title', __('site.vacancy.page_title'))
 @section('meta_description', __('site.vacancy.meta_desc'))
-@section('meta_keywords', 'school jobs Barchhain, teaching jobs Doti Nepal, Barchhain Secondary School vacancy, teacher vacancy Nepal, school staff jobs Barchhain, education jobs Sudurpashchim Province')
+@section('meta_keywords', 'school jobs, teaching jobs Nepal, teacher vacancy Nepal, school staff jobs, education jobs')
 
 @section('schema')
 @if($vacancies->count())
@@ -10,7 +10,7 @@
 {
     "@context": "https://schema.org",
     "@type": "ItemList",
-    "name": "Job Vacancies at Barchhain Secondary School",
+    "name": {{ json_encode('Job Vacancies at ' . $siteSettings->localized('site_name', config('app.name'))) }},
     "itemListElement": [
         @foreach($vacancies as $i => $v)
         {
@@ -22,7 +22,7 @@
                 "description": "{{ strip_tags($v->description) }}",
                 "hiringOrganization": {
                     "@type": "Organization",
-                    "name": "Barchhain Secondary School",
+                    "name": {{ json_encode($siteSettings->localized('site_name', config('app.name'))) }},
                     "sameAs": "{{ url('/') }}",
                     "logo": "{{ $siteSettings->logoUrl() }}"
                 },
@@ -30,9 +30,9 @@
                     "@type": "Place",
                     "address": {
                         "@type": "PostalAddress",
-                        "streetAddress": "Barchhain",
-                        "addressLocality": "Barchhain",
-                        "addressRegion": "Doti",
+                        "streetAddress": {{ json_encode($siteSettings->get('school_street', 'Nepal')) }},
+                        "addressLocality": {{ json_encode($siteSettings->get('school_locality', '')) }},
+                        "addressRegion": {{ json_encode($siteSettings->get('school_region', '')) }},
                         "addressCountry": "NP"
                     }
                 },

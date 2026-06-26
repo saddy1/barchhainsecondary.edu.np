@@ -5,6 +5,16 @@
     $footerAccent    = $siteSettings->get('secondary_color',      '#e2a024');
     $footerDark      = $siteSettings->get('dark_color',           '#0b2415');
     $footerGradient  = "linear-gradient(135deg, {$footerBg} 0%, {$footerGradEnd} 100%)";
+    $quickLinks      = \App\Models\QuickLink::where('is_active', true)->orderBy('sort_order')->get();
+    $footerNav = [
+        ['label' => __('site.nav.home'),        'url' => url('/')],
+        ['label' => __('site.nav.about_us'),    'url' => url('/about')],
+        ['label' => __('site.nav.admissions'),  'url' => url('/admissions')],
+        ['label' => __('site.nav.news_events'), 'url' => url('/news')],
+        ['label' => __('site.nav.gallery'),     'url' => url('/gallery')],
+        ['label' => __('site.nav.vacancies'),   'url' => route('vacancies')],
+        ['label' => __('site.nav.contact'),     'url' => url('/contact')],
+    ];
 
     $socials = [
         'social_facebook'  => ['label' => 'Facebook',   'hover' => '#1877F2',
@@ -24,28 +34,40 @@
 @endphp
 
 <style>
-    .site-footer { --footer-accent: {{ $footerAccent }}; }
+    .site-footer { --footer-accent: {{ $footerAccent }}; --footer-muted: rgba(255,255,255,.68); }
     .footer-brand-text {
         max-width: 24rem;
     }
     .footer-link {
-        color: rgba(255,255,255,0.72);
-        font-size: .9rem;
-        font-weight: 700;
-        letter-spacing: .01em;
-        transition: color .15s, transform .15s;
+        color: var(--footer-muted);
+        display: inline-flex;
+        width: fit-content;
+        font-size: .95rem;
+        font-weight: 800;
+        line-height: 1.45;
+        transition: color .15s, transform .15s, padding-left .15s;
         white-space: nowrap;
     }
-    .footer-link:hover { color: var(--footer-accent); transform: translateY(-1px); }
+    .footer-link:hover { color: var(--footer-accent); transform: translateX(2px); }
+    .footer-heading {
+        color: var(--footer-accent);
+        font-size: .72rem;
+        font-weight: 900;
+        letter-spacing: .2em;
+        text-transform: uppercase;
+    }
+    .footer-divider {
+        background: linear-gradient(to bottom, transparent, rgba(255,255,255,.18), transparent);
+    }
     .footer-social {
-        width: 42px;
-        height: 42px;
-        border-radius: 12px;
+        width: 44px;
+        height: 44px;
+        border-radius: 14px;
         display: flex;
         align-items: center;
         justify-content: center;
-        background: rgba(255,255,255,0.12);
-        border: 1px solid rgba(226,160,36,0.45);
+        background: rgba(255,255,255,0.10);
+        border: 1px solid rgba(226,160,36,0.55);
         color: #fff;
         box-shadow: 0 10px 22px rgba(0,0,0,0.18), inset 0 1px 0 rgba(255,255,255,0.14);
         transition: background .2s, border-color .2s, color .2s, transform .15s, box-shadow .2s;
@@ -58,60 +80,75 @@
     }
 </style>
 
-<footer class="site-footer" style="background:{{ $footerGradient }}; border-top:4px solid {{ $footerAccent }};">
+<footer class="site-footer" style="background:{{ $footerGradient }};">
 
     {{-- ── Main content ──────────────────────────────────── --}}
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-10">
-        <div class="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-6 sm:gap-8">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 sm:py-12 lg:py-14">
+        <div class="grid gap-9 lg:grid-cols-[1.55fr_1px_.72fr_1px_.95fr_1px_1.45fr] lg:items-start">
 
             {{-- Brand --}}
-            <div class="flex items-center justify-center sm:justify-start gap-3.5 shrink-0 xl:w-[29%]">
-                <div class="w-14 h-14 bg-white rounded-xl p-1.5 flex items-center justify-center shrink-0 shadow-lg shadow-black/20">
+            <div class="flex items-center gap-4">
+                <div class="w-16 h-16 sm:w-20 sm:h-20 bg-white rounded-2xl p-2 flex items-center justify-center shrink-0 shadow-xl shadow-black/25">
                     <img src="{{ $siteSettings->logoUrl() }}"
                          alt="{{ $siteSettings->localized('site_name', __('site.school_name')) }}"
                          class="w-full h-full object-contain">
                 </div>
-                <div class="footer-brand-text leading-tight text-center sm:text-left">
-                    <p class="text-white font-extrabold text-base sm:text-lg leading-snug">{{ $siteSettings->localized('site_name', __('site.school_name')) }}</p>
-                    <p class="text-xs sm:text-sm font-semibold mt-1 leading-relaxed" style="color:{{ $footerAccent }};">{{ $siteSettings->localized('site_tagline', __('site.footer.about_text')) }}</p>
+                <div class="footer-brand-text min-w-0">
+                    <p class="text-white font-black text-xl sm:text-2xl leading-tight">{{ $siteSettings->localized('site_name', __('site.school_name')) }}</p>
+                    <p class="text-sm sm:text-base font-extrabold mt-2 leading-relaxed" style="color:{{ $footerAccent }};">{{ $siteSettings->localized('site_tagline', __('site.footer.about_text')) }}</p>
                 </div>
             </div>
 
-            {{-- Divider (xl only) --}}
-            <div class="hidden xl:block h-12 w-px bg-white/15 shrink-0"></div>
+            <div class="hidden lg:block footer-divider h-full w-px"></div>
 
-            {{-- Nav links — 2-col grid on mobile, wrap on larger --}}
-            <nav class="grid grid-cols-2 sm:flex sm:flex-wrap items-center justify-center gap-x-6 gap-y-2.5 xl:flex-1 xl:px-6">
-                <a href="{{ url('/') }}"               class="footer-link text-center sm:text-left">{{ __('site.nav.home') }}</a>
-                <a href="{{ url('/about') }}"           class="footer-link text-center sm:text-left">{{ __('site.nav.about_us') }}</a>
-                <a href="{{ url('/admissions') }}"      class="footer-link text-center sm:text-left">{{ __('site.nav.admissions') }}</a>
-                <a href="{{ url('/news') }}"            class="footer-link text-center sm:text-left">{{ __('site.nav.news_events') }}</a>
-                <a href="{{ url('/gallery') }}"         class="footer-link text-center sm:text-left">{{ __('site.nav.gallery') }}</a>
-                <a href="{{ route('vacancies') }}"      class="footer-link text-center sm:text-left">{{ __('site.nav.vacancies') }}</a>
-                <a href="{{ url('/contact') }}"         class="footer-link text-center sm:text-left col-span-2 sm:col-span-1">{{ __('site.nav.contact') }}</a>
+            {{-- Main links --}}
+            <nav class="grid grid-cols-2 gap-x-6 gap-y-2 sm:grid-cols-3 lg:grid-cols-1">
+                @foreach($footerNav as $item)
+                    <a href="{{ $item['url'] }}" class="footer-link">{{ $item['label'] }}</a>
+                @endforeach
             </nav>
 
-            <div class="flex flex-col items-center xl:items-end gap-3 xl:w-[29%]">
-                {{-- Contact quick-info — visible on sm+ (was xl only) --}}
-                <div class="flex flex-col items-center sm:items-end gap-1.5 shrink-0">
+            <div class="hidden lg:block footer-divider h-full w-px"></div>
+
+            {{-- Quick Links column — only rendered when there are active links --}}
+            @if($quickLinks->isNotEmpty())
+            <div>
+                <p class="footer-heading mb-4">Quick Links</p>
+                <div class="grid grid-cols-1 gap-2">
+                    @foreach($quickLinks as $ql)
+                    <a href="{{ $ql->url }}"
+                       @if($ql->open_in_new_tab) target="_blank" rel="noopener" @endif
+                       class="footer-link">{{ $ql->title }}</a>
+                    @endforeach
+                </div>
+            </div>
+            <div class="hidden lg:block footer-divider h-full w-px"></div>
+            @else
+            <div class="hidden lg:block"></div>
+            <div class="hidden lg:block footer-divider h-full w-px"></div>
+            @endif
+
+            {{-- Contact and socials --}}
+            <div class="flex flex-col items-start gap-5">
+                <div class="flex flex-col items-start gap-3">
                     @if($siteSettings->get('school_phone'))
-                    <span class="flex items-center gap-2 text-sm font-semibold text-white/70">
-                        <svg class="w-4 h-4 shrink-0" style="color:{{ $footerAccent }};" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg>
-                        {{ $siteSettings->get('school_phone') }}
+                    <span class="flex min-w-0 items-center gap-3 text-base font-extrabold text-white/70">
+                        <svg class="w-5 h-5 shrink-0" style="color:{{ $footerAccent }};" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg>
+                        <span class="truncate">{{ $siteSettings->get('school_phone') }}</span>
                     </span>
                     @endif
                     @if($siteSettings->get('school_email'))
                     <a href="mailto:{{ $siteSettings->get('school_email') }}"
-                       class="flex items-center gap-2 text-sm font-semibold text-white/70 hover:text-white transition-colors">
-                        <svg class="w-4 h-4 shrink-0" style="color:{{ $footerAccent }};" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
-                        {{ $siteSettings->get('school_email') }}
+                       class="flex min-w-0 items-center gap-3 text-base font-extrabold text-white/70 hover:text-white transition-colors">
+                        <svg class="w-5 h-5 shrink-0" style="color:{{ $footerAccent }};" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+                        <span class="truncate">{{ $siteSettings->get('school_email') }}</span>
                     </a>
                     @endif
                 </div>
 
                 {{-- Social icons --}}
                 @if(count($activeSocials))
-                <div class="flex flex-wrap items-center justify-center xl:justify-end gap-2.5 shrink-0">
+                <div class="flex flex-wrap items-center gap-3">
                     @foreach($activeSocials as $key => $s)
                     <a href="{{ $siteSettings->get($key) }}" target="_blank" rel="noopener" aria-label="{{ $s['label'] }}"
                        class="footer-social"
@@ -129,14 +166,14 @@
 
     {{-- ── Copyright bar ────────────────────────────────── --}}
     <div style="background:rgba(0,0,0,0.25); border-top:1px solid rgba(255,255,255,0.08);">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex flex-col lg:flex-row items-center justify-between gap-3 text-sm font-medium text-white/55">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex flex-col lg:flex-row items-center justify-between gap-3 text-sm font-bold text-white/60">
             <p class="text-center lg:text-left">&copy; {{ date('Y') }} {{ $siteSettings->localized('site_name', __('site.school_name')) }}. {{ __('site.footer.all_rights') }}</p>
             <div class="flex flex-wrap items-center justify-center lg:justify-end gap-x-5 gap-y-2 text-center lg:text-right">
-                <a href="{{ route('login') }}"           class="hover:text-white/70 transition-colors">{{ __('site.nav.staff_portal') }}</a>
-                <a href="/student/card/login"            class="hover:text-white/70 transition-colors">{{ __('site.nav.student_portal') }}</a>
-                <a href="{{ route('applicant.login') }}" class="hover:text-white/70 transition-colors">{{ __('site.nav.applicant_login') }}</a>
+                <a href="{{ route('login') }}"           class="hover:text-white transition-colors">{{ __('site.nav.staff_portal') }}</a>
+                <a href="/student/card/login"            class="hover:text-white transition-colors">{{ __('site.nav.student_portal') }}</a>
+                <a href="{{ route('applicant.login') }}" class="hover:text-white transition-colors">{{ __('site.nav.applicant_login') }}</a>
                 <span class="text-white/20">·</span>
-                <span>{{ __('site.footer.designed') }} <a href="#" target="_blank" style="color:{{ $footerAccent }};" class="hover:underline transition-colors">Broad Tech Infosys</a></span>
+                <span>{{ __('site.footer.designed') }} <a href="#" target="_blank" style="color:{{ $footerAccent }};" class="font-black hover:underline transition-colors">Broad Tech Infosys</a></span>
             </div>
         </div>
     </div>

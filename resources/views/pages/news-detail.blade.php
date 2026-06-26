@@ -1,7 +1,7 @@
 {{-- resources/views/pages/news-detail.blade.php --}}
 @extends('layouts.app')
 
-@section('title', $announcement->title . ' — Barchhain Secondary School')
+@section('title', $announcement->title)
 @section('meta_description', $announcement->excerpt ?? Str::limit(strip_tags($announcement->content), 150))
 
 @section('content')

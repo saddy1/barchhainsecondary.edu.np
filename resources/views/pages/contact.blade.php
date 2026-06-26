@@ -77,15 +77,26 @@
                 </h2>
                 
                 {{-- Interactive Map --}}
+                @php
+                    $mapLat  = $siteSettings->get('map_latitude',  '29.2844');
+                    $mapLng  = $siteSettings->get('map_longitude', '81.0897');
+                    $mapZoom = $siteSettings->get('map_zoom',      '16');
+                    $mapSrc  = "https://maps.google.com/maps?q={$mapLat},{$mapLng}&t=&z={$mapZoom}&ie=UTF8&iwloc=&output=embed";
+                @endphp
                 <div class="rounded-4xl overflow-hidden shadow-lg border-4 border-white h-80 mb-8 relative group">
                     <div class="absolute inset-0 bg-[#1a5632]/10 group-hover:opacity-0 transition-opacity duration-500 pointer-events-none z-10"></div>
-                    <iframe 
-                        src="https://maps.google.com/maps?q=Barchhain+Secondary+School,+Barchhain,+Nepal&t=&z=16&ie=UTF8&iwloc=&output=embed" 
-                        width="100%" height="100%" style="border:0;" allowfullscreen="" loading="lazy" referrerpolicy="no-referrer-when-downgrade" title="Barchhain Secondary School Location" class="grayscale-20 group-hover:grayscale-0 transition-all duration-500">
+                    <iframe
+                        src="{{ $mapSrc }}"
+                        width="100%" height="100%" style="border:0;" allowfullscreen="" loading="lazy" referrerpolicy="no-referrer-when-downgrade" title="{{ $siteSettings->localized('site_name', __('site.school_name')) }} Location" class="grayscale-20 group-hover:grayscale-0 transition-all duration-500">
                     </iframe>
                 </div>
-                
+
                 {{-- Office Hours Card --}}
+                @php
+                    $ohDays   = $siteSettings->get('office_hours_days',   'Sunday – Friday');
+                    $ohTime   = $siteSettings->get('office_hours_time',   '9:00 AM – 5:00 PM');
+                    $ohClosed = $siteSettings->get('office_hours_closed', 'Saturday & Public Holidays');
+                @endphp
                 <div class="bg-[#1a5632] text-white rounded-4xl p-8 shadow-xl relative overflow-hidden">
                     <div class="absolute top-0 right-0 w-32 h-32 bg-[#e2a024] rounded-full blur-3xl opacity-20 -translate-y-1/2 translate-x-1/2"></div>
                     <h3 class="text-2xl font-bold mb-6 flex items-center gap-3">
@@ -94,11 +105,11 @@
                     </h3>
                     <div class="space-y-4 text-green-50 font-medium">
                         <div class="flex justify-between items-center border-b border-white/10 pb-3">
-                            <span class="flex items-center gap-2"><div class="w-2 h-2 rounded-full bg-[#e2a024]"></div> Monday – Friday</span>
-                            <span class="text-[#e2a024] font-bold">9:00 AM – 5:00 PM</span>
+                            <span class="flex items-center gap-2"><div class="w-2 h-2 rounded-full bg-[#e2a024]"></div> {{ $ohDays }}</span>
+                            <span class="text-[#e2a024] font-bold">{{ $ohTime }}</span>
                         </div>
                         <div class="flex justify-between items-center pt-1">
-                            <span class="flex items-center gap-2"><div class="w-2 h-2 rounded-full bg-red-400"></div> Public Holidays</span>
+                            <span class="flex items-center gap-2"><div class="w-2 h-2 rounded-full bg-red-400"></div> {{ $ohClosed }}</span>
                             <span class="text-red-300 font-bold bg-red-500/10 px-3 py-1 rounded-full text-xs">Closed</span>
                         </div>
                     </div>
