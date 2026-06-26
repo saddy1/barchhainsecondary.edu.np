@@ -95,7 +95,22 @@ class StudentController extends Controller
             ->whereDate('valid_till', '<', now()->toDateString())
             ->count();
 
-        $students = $query->latest()->paginate(15)->withQueryString();
+        $allowedPerPage = [10, 20, 40, 100];
+        $perPageParam   = $request->per_page ?? '';
+
+        if ($perPageParam === 'all') {
+            $perPage = max(1, (clone $query)->count());
+        } elseif (in_array((int) $perPageParam, $allowedPerPage)) {
+            $perPage = (int) $perPageParam;
+        } else {
+            $perPage = 20;
+        }
+
+        $students = $query
+            ->orderByRaw('CASE WHEN member_type = ? THEN 0 WHEN member_type = ? THEN 1 ELSE 2 END', ['student', 'teacher'])
+            ->latest()
+            ->paginate($perPage)
+            ->withQueryString();
 
         return view('card.students.index', compact('students', 'filterOptions', 'expiredCount'));
     }

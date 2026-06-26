@@ -8,7 +8,7 @@
     $activeTab = $selectedClass ? (string) $selectedClass->id : 'all';
 @endphp
 
-<div class="space-y-6">
+<div class="space-y-6" x-data="{ classSearch: '', teacherSearch: '', subjectSearch: '' }">
     <div class="rounded-2xl bg-gradient-to-br from-[#0b2415] to-[#1a5632] p-5 sm:p-6 text-white shadow-sm">
         <p class="text-sm font-bold uppercase tracking-widest text-white/50">E-Learning Access</p>
         <h1 class="mt-1 text-3xl font-extrabold">Teacher Class Mapping</h1>
@@ -24,6 +24,16 @@
     @endif
 
     {{-- Class Tabs --}}
+    <div class="rounded-2xl border border-gray-200 bg-white p-3 shadow-sm">
+        <div class="mb-3 grid gap-2 sm:grid-cols-[1fr_auto] sm:items-center">
+            <input
+                type="search"
+                x-model.debounce.150ms="classSearch"
+                placeholder="Search class..."
+                class="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm font-bold focus:border-[#1a5632] focus:outline-none focus:ring-2 focus:ring-[#1a5632]/10"
+            >
+            <span class="text-xs font-bold text-gray-400">Real-time class filter</span>
+        </div>
     <div class="flex flex-wrap gap-2">
         <a href="{{ route('admin.learning.teacher-maps.index', ['tab' => 'all']) }}"
            class="rounded-full px-4 py-2 text-sm font-bold transition-colors
@@ -32,6 +42,7 @@
         </a>
         @foreach($classes as $class)
             <a href="{{ route('admin.learning.teacher-maps.index', ['tab' => $class->id]) }}"
+               x-show="@js(strtolower($class->name)).includes(classSearch.toLowerCase())"
                class="inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-bold transition-colors
                       {{ $activeTab === (string) $class->id ? 'bg-[#1a5632] text-white shadow-sm' : 'bg-white border border-gray-200 text-gray-600 hover:border-[#1a5632]/40 hover:text-[#1a5632]' }}">
                 {{ $class->name }}
@@ -40,6 +51,7 @@
                 </span>
             </a>
         @endforeach
+    </div>
     </div>
 
     @if($selectedClass)
@@ -61,6 +73,7 @@
                 <form method="POST" action="{{ route('admin.learning.teacher-maps.updateByClass', $selectedClass) }}"
                       x-data="{
                           selected: {{ json_encode($assignedTeacherIds) }},
+                          teacherSearch: '',
                           toggle(id) {
                               const idx = this.selected.indexOf(id);
                               idx === -1 ? this.selected.push(id) : this.selected.splice(idx, 1);
@@ -75,14 +88,24 @@
                         <input type="hidden" name="user_ids[]" :value="id">
                     </template>
 
-                    <div class="grid gap-3 p-5 sm:grid-cols-2 lg:grid-cols-3">
+                    <div class="border-b border-gray-100 px-5 py-3">
+                        <input
+                            type="search"
+                            x-model.debounce.150ms="teacherSearch"
+                            placeholder="Search teacher..."
+                            class="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm font-bold focus:border-[#1a5632] focus:outline-none focus:ring-2 focus:ring-[#1a5632]/10"
+                        >
+                    </div>
+
+                    <div class="grid gap-2 p-4 sm:grid-cols-2 lg:grid-cols-3">
                         @forelse($teachers as $teacher)
                             <button type="button"
+                                    x-show="@js(strtolower($teacher->name . ' ' . $teacher->email)).includes(teacherSearch.toLowerCase())"
                                     @click="toggle({{ $teacher->id }})"
                                     :class="isSelected({{ $teacher->id }})
                                         ? 'border-emerald-400 bg-emerald-50 ring-2 ring-emerald-300'
                                         : 'border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50'"
-                                    class="relative w-full text-left rounded-xl border px-4 py-3 transition-all duration-150 focus:outline-none">
+                                    class="relative w-full text-left rounded-xl border px-3 py-2 transition-all duration-150 focus:outline-none">
 
                                 {{-- Checkmark badge --}}
                                 <span x-show="isSelected({{ $teacher->id }})"
@@ -97,7 +120,7 @@
 
                                 <div class="flex items-center gap-2.5 pr-6">
                                     <div :class="isSelected({{ $teacher->id }}) ? 'bg-emerald-600' : 'bg-[#1a5632]'"
-                                         class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-xs font-extrabold text-white transition-colors">
+                                         class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-extrabold text-white transition-colors">
                                         {{ strtoupper(substr($teacher->name, 0, 1)) }}
                                     </div>
                                     <div class="min-w-0">
@@ -159,24 +182,37 @@
 
         {{-- ── Subject Assignment ── --}}
         <div class="space-y-3">
-            <div class="flex items-center gap-3 flex-wrap">
-                <h2 class="text-xl font-extrabold text-gray-900">Subject Assignment</h2>
-                <span class="rounded-full bg-violet-50 px-3 py-1 text-xs font-extrabold text-violet-700">
-                    {{ $classSubjects->count() }} {{ $classSubjects->count() === 1 ? 'subject' : 'subjects' }} in {{ $selectedClass->name }}
-                </span>
+            <div class="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
+                <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                        <h2 class="text-lg font-extrabold text-gray-900">Subject Assignment</h2>
+                        <p class="text-xs font-semibold text-gray-500">Subjects stay hidden until you open one for mapping.</p>
+                    </div>
+                    <span class="rounded-full bg-violet-50 px-3 py-1 text-xs font-extrabold text-violet-700">
+                        {{ $classSubjects->count() }} {{ $classSubjects->count() === 1 ? 'subject' : 'subjects' }} in {{ $selectedClass->name }}
+                    </span>
+                </div>
+                <input
+                    type="search"
+                    x-model.debounce.150ms="subjectSearch"
+                    placeholder="Search subject..."
+                    class="mt-3 w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm font-bold focus:border-violet-700 focus:outline-none focus:ring-2 focus:ring-violet-700/10"
+                >
             </div>
-            <p class="text-sm text-gray-500">A teacher needs <strong>both</strong> class access (above) <strong>and</strong> subject access (below) to manage lessons for a subject.</p>
 
             @forelse($classSubjects as $subject)
                 @php $assignedSubjectTeacherIds = $subject->assignedTeachers->pluck('id')->all(); @endphp
                 <div class="rounded-2xl border border-gray-200 bg-white shadow-sm overflow-hidden"
+                     x-show="@js(strtolower($subject->name . ' ' . $subject->code)).includes(subjectSearch.toLowerCase())"
                      x-data="{
+                         open: false,
+                         teacherSearch: '',
                          selected: {{ json_encode($assignedSubjectTeacherIds) }},
                          toggle(id) { const idx = this.selected.indexOf(id); idx === -1 ? this.selected.push(id) : this.selected.splice(idx, 1); },
                          isSelected(id) { return this.selected.includes(id); }
                      }">
 
-                    <div class="border-b border-gray-100 px-5 py-3 flex items-center justify-between bg-gray-50/70">
+                    <button type="button" @click="open = ! open" class="flex w-full items-center justify-between gap-3 bg-gray-50/70 px-4 py-3 text-left">
                         <div class="flex items-center gap-2.5">
                             <span class="flex h-8 w-8 items-center justify-center rounded-full bg-violet-100 text-sm font-extrabold text-violet-700">
                                 {{ strtoupper(substr($subject->name, 0, 1)) }}
@@ -188,25 +224,40 @@
                                 @endif
                             </div>
                         </div>
-                        <span class="rounded-full bg-violet-50 px-2.5 py-1 text-xs font-extrabold text-violet-700">
-                            <span x-text="selected.length">{{ count($assignedSubjectTeacherIds) }}</span> assigned
-                        </span>
-                    </div>
+                        <div class="flex items-center gap-2">
+                            <span class="rounded-full bg-violet-50 px-2.5 py-1 text-xs font-extrabold text-violet-700">
+                                <span x-text="selected.length">{{ count($assignedSubjectTeacherIds) }}</span> assigned
+                            </span>
+                            <svg class="h-4 w-4 text-gray-400 transition-transform" :class="open ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7"/>
+                            </svg>
+                        </div>
+                    </button>
 
-                    <form method="POST" action="{{ route('admin.learning.teacher-maps.updateBySubject', $subject) }}">
+                    <form method="POST" action="{{ route('admin.learning.teacher-maps.updateBySubject', $subject) }}" x-show="open" style="display: none;">
                         @csrf @method('PATCH')
                         <template x-for="id in selected" :key="id">
                             <input type="hidden" name="user_ids[]" :value="id">
                         </template>
 
-                        <div class="grid gap-2 p-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+                        <div class="border-t border-gray-100 p-3">
+                            <input
+                                type="search"
+                                x-model.debounce.150ms="teacherSearch"
+                                placeholder="Search teacher for {{ $subject->name }}..."
+                                class="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm font-bold focus:border-violet-700 focus:outline-none focus:ring-2 focus:ring-violet-700/10"
+                            >
+                        </div>
+
+                        <div class="grid gap-1.5 px-3 pb-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
                             @forelse($selectedClass->teachers as $teacher)
                                 <button type="button"
+                                        x-show="@js(strtolower($teacher->name . ' ' . $teacher->email)).includes(teacherSearch.toLowerCase())"
                                         @click="toggle({{ $teacher->id }})"
                                         :class="isSelected({{ $teacher->id }})
                                             ? 'border-violet-400 bg-violet-50 ring-2 ring-violet-300'
                                             : 'border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50'"
-                                        class="relative flex items-center gap-2.5 rounded-xl border px-3 py-2.5 text-left transition-all duration-150 focus:outline-none">
+                                        class="relative flex items-center gap-2 rounded-lg border px-2.5 py-2 text-left transition-all duration-150 focus:outline-none">
                                     <span x-show="isSelected({{ $teacher->id }})"
                                           class="shrink-0 flex h-4 w-4 items-center justify-center rounded-full bg-violet-500">
                                         <svg class="h-2.5 w-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3">
@@ -227,7 +278,8 @@
                             @endforelse
                         </div>
 
-                        <div class="border-t border-gray-100 px-4 py-3 flex justify-end">
+                        <div class="border-t border-gray-100 px-4 py-3 flex items-center justify-between">
+                            <p class="text-xs font-bold text-gray-500"><span x-text="selected.length"></span> selected</p>
                             <button type="submit"
                                     class="rounded-xl bg-violet-700 px-4 py-2 text-xs font-extrabold text-white hover:bg-violet-900 transition-colors">
                                 Save Subject Assignment
@@ -247,14 +299,23 @@
         <div class="grid gap-4 lg:grid-cols-[1fr_320px]">
             <div class="rounded-2xl border border-gray-200 bg-white shadow-sm">
                 <div class="border-b border-gray-100 px-5 py-4">
-                    <h2 class="text-lg font-extrabold text-gray-950">Teachers</h2>
-                    <p class="mt-1 text-sm font-medium text-gray-500">Use this screen for final class-level responsibility. Course/resource permissions still come from Set Permission.</p>
+                    <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                        <div>
+                            <h2 class="text-lg font-extrabold text-gray-950">Teachers</h2>
+                            <p class="mt-1 text-sm font-medium text-gray-500">Search teacher or class, then tick class responsibility.</p>
+                        </div>
+                        <div class="grid gap-2 sm:w-[420px] sm:grid-cols-2">
+                            <input type="search" x-model.debounce.150ms="teacherSearch" placeholder="Search teacher..." class="rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm font-bold focus:border-[#1a5632] focus:outline-none focus:ring-2 focus:ring-[#1a5632]/10">
+                            <input type="search" x-model.debounce.150ms="classSearch" placeholder="Search class..." class="rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm font-bold focus:border-[#1a5632] focus:outline-none focus:ring-2 focus:ring-[#1a5632]/10">
+                        </div>
+                    </div>
                 </div>
 
                 <div class="divide-y divide-gray-100">
                     @forelse($teachers as $teacher)
                         @php $assignedIds = $teacher->assignedLearningClasses->pluck('id')->all(); @endphp
                         <div class="p-5"
+                             x-show="@js(strtolower($teacher->name . ' ' . $teacher->email)).includes(teacherSearch.toLowerCase())"
                              x-data="{
                                  selected: {{ json_encode($assignedIds) }},
                                  toggle(id) {
@@ -287,14 +348,15 @@
                                     </button>
                                 </div>
 
-                                <div class="mt-3 grid gap-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+                                <div class="mt-3 grid gap-1.5 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
                                     @foreach($classes as $class)
                                         <button type="button"
+                                                x-show="@js(strtolower($class->name)).includes(classSearch.toLowerCase())"
                                                 @click="toggle({{ $class->id }})"
                                                 :class="isSelected({{ $class->id }})
                                                     ? 'border-emerald-400 bg-emerald-50 ring-2 ring-emerald-300 text-emerald-900'
                                                     : 'border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50 text-gray-700'"
-                                                class="relative rounded-xl border px-3 py-2.5 text-left text-sm font-bold transition-all duration-150 focus:outline-none">
+                                                class="relative rounded-lg border px-2.5 py-2 text-left text-xs font-bold transition-all duration-150 focus:outline-none">
                                             <span x-show="isSelected({{ $class->id }})"
                                                   class="absolute right-1.5 top-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-emerald-500">
                                                 <svg class="h-2.5 w-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3">

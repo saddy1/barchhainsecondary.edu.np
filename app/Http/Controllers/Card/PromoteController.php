@@ -4,9 +4,11 @@ namespace App\Http\Controllers\Card;
 
 use App\Http\Controllers\Controller;
 
+use App\Models\Card\Organization;
 use App\Models\Card\Student;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 class PromoteController extends Controller
 {
@@ -18,7 +20,7 @@ class PromoteController extends Controller
     {
         $user = auth()->user();
 
-        // All school student groups (stream + section) with counts
+        // Distinct class/section groups with counts for the filter panel
         $groups = Student::query()
             ->tap(fn($query) => $user->applyStudentScope($query))
             ->where('organization', 'school')
@@ -30,22 +32,54 @@ class PromoteController extends Controller
             ->orderBy('section')
             ->get()
             ->map(function ($g) {
-                $suggestedStream  = $this->suggestPromotion($g->stream ?? '');
-                $currentClass     = $this->extractClassNumber($g->stream ?? '');
-                $isGradYear       = $currentClass !== null && $currentClass >= self::MAX_CLASS;
-
+                $suggestedStream = $this->suggestPromotion($g->stream ?? '');
+                $currentClass    = $this->extractClassNumber($g->stream ?? '');
                 return [
                     'stream'           => $g->stream,
                     'section'          => $g->section,
                     'count'            => $g->count,
                     'suggested_stream' => $suggestedStream,
-                    'current_class'    => $currentClass,
-                    'is_grad_year'     => $isGradYear,
-                    'label'            => trim(($g->stream ?? '(No class)') . ' ' . ($g->section ?? '')),
+                    'is_grad_year'     => $currentClass !== null && $currentClass >= self::MAX_CLASS,
+                    'label'            => trim(($g->stream ?? '(No class)') . ($g->section ? ' / ' . $g->section : '')),
                 ];
             });
 
-        return view('card.students.promote', compact('groups'));
+        $availableStreams = $this->availableStreamsFor($user, $groups);
+
+        return view('hr.members.promote', compact('groups', 'availableStreams'));
+    }
+
+    // ── AJAX: students in a class/section ────────────────────────────────
+    public function students(\Illuminate\Http\Request $request)
+    {
+        $stream  = $request->input('stream');
+        $section = $request->input('section');
+        $q       = trim((string) $request->input('q', ''));
+        $user    = auth()->user();
+
+        $students = Student::query()
+            ->tap(fn($query) => $user->applyStudentScope($query))
+            ->where('organization', 'school')
+            ->where('member_type', 'student')
+            ->when($stream  !== null, fn ($query) => $query->where('stream',  $stream  ?: null))
+            ->when($section !== null, fn ($query) => $query->where('section', $section ?: null))
+            ->when($q !== '', function ($query) use ($q) {
+                $query->where(function ($inner) use ($q) {
+                    $inner->where('first_name', 'like', "%{$q}%")
+                          ->orWhere('last_name',  'like', "%{$q}%")
+                          ->orWhere('roll_number','like', "%{$q}%");
+                });
+            })
+            ->orderBy('roll_number')
+            ->get(['id', 'first_name', 'middle_name', 'last_name', 'roll_number', 'stream', 'section', 'photo'])
+            ->map(fn (Student $s) => [
+                'id'          => $s->id,
+                'name'        => trim("{$s->first_name} {$s->middle_name} {$s->last_name}"),
+                'roll_number' => $s->roll_number,
+                'photo_url'   => $s->photo_url,
+            ]);
+
+        return response()->json(['students' => $students]);
     }
 
     // ── Apply promotion ───────────────────────────────────────────────────
@@ -54,25 +88,57 @@ class PromoteController extends Controller
         $user = auth()->user();
 
         $request->validate([
-            'groups'              => 'required|array|min:1',
-            'groups.*.from_stream'=> 'nullable|string|max:100',
+            'groups'               => 'required|array|min:1',
+            'groups.*.from_stream' => 'nullable|string|max:100',
             'groups.*.from_section'=> 'nullable|string|max:50',
-            'groups.*.to_stream'  => 'nullable|string|max:100',
-            'groups.*.to_section' => 'nullable|string|max:50',
-            'groups.*.action'     => 'required|in:promote,graduate,skip',
-            'valid_till'          => 'nullable|date',
-            'grad_action'         => 'required|in:mark,delete',
+            'groups.*.to_stream'   => 'nullable|string|max:100',
+            'groups.*.to_section'  => 'nullable|string|max:50',
+            'groups.*.action'      => 'required|in:promote,graduate,skip',
+            'valid_till'           => 'nullable|date',
+            'grad_action'          => 'required|in:mark,delete',
+            'student_ids'          => 'nullable|array',
+            'student_ids.*'        => 'integer|exists:students,id',
         ]);
 
         $groups     = $request->input('groups', []);
         $gradAction = $request->input('grad_action', 'mark');
         $validTill  = $request->input('valid_till');
+        $studentIds = $request->input('student_ids', []);
+        $availableStreams = $this->availableStreamsFor($user);
+
+        foreach ($groups as $index => $group) {
+            if (($group['action'] ?? null) !== 'promote') {
+                continue;
+            }
+
+            $fromStream = trim((string) ($group['from_stream'] ?? ''));
+            $toStream   = trim((string) ($group['to_stream'] ?? ''));
+
+            if ($toStream === '') {
+                throw ValidationException::withMessages([
+                    "groups.{$index}.to_stream" => 'Choose a target class before promoting students.',
+                ]);
+            }
+
+            if (strcasecmp($fromStream, $toStream) === 0) {
+                throw ValidationException::withMessages([
+                    "groups.{$index}.to_stream" => 'Target class must be different from the current class.',
+                ]);
+            }
+
+            $isAvailable = $availableStreams->contains(fn ($stream) => strcasecmp($stream, $toStream) === 0);
+            if (!$isAvailable) {
+                throw ValidationException::withMessages([
+                    "groups.{$index}.to_stream" => 'Choose a target class from the available class list.',
+                ]);
+            }
+        }
 
         $promoted  = 0;
         $graduated = 0;
         $deleted   = 0;
 
-        DB::transaction(function () use ($groups, $gradAction, $validTill, $user, &$promoted, &$graduated, &$deleted) {
+        DB::transaction(function () use ($groups, $gradAction, $validTill, $studentIds, $user, &$promoted, &$graduated, &$deleted) {
             foreach ($groups as $g) {
                 if ($g['action'] === 'skip') continue;
 
@@ -81,7 +147,8 @@ class PromoteController extends Controller
                     ->where('organization', 'school')
                     ->where('member_type', 'student')
                     ->where('stream', $g['from_stream'] ?: null)
-                    ->where('section', $g['from_section'] ?: null);
+                    ->where('section', $g['from_section'] ?: null)
+                    ->when(!empty($studentIds), fn ($q) => $q->whereIn('id', $studentIds));
 
                 if ($g['action'] === 'graduate') {
                     if ($gradAction === 'delete') {
@@ -108,7 +175,7 @@ class PromoteController extends Controller
         if ($graduated) $msg[] = "{$graduated} student(s) marked as Graduated";
         if ($deleted)   $msg[] = "{$deleted} student(s) removed (graduated/left)";
 
-        return redirect()->route('students.index')
+        return redirect()->route('admin.hr.members.index')
                          ->with('success', implode(', ', $msg) . '.');
     }
 
@@ -138,5 +205,35 @@ class PromoteController extends Controller
             return (int)$m[1];
         }
         return null;
+    }
+
+    private function availableStreamsFor($user, $fallbackGroups = null)
+    {
+        $schoolOrganization = Organization::where('slug', 'school')
+            ->where('is_active', true)
+            ->with('activeDepartments')
+            ->first();
+
+        $streams = $schoolOrganization
+            ? $schoolOrganization->activeDepartments
+                ->pluck('name')
+            : collect();
+
+        if ($streams->isEmpty()) {
+            $streams = $fallbackGroups
+                ? $fallbackGroups->pluck('stream')
+                : Student::query()
+                    ->tap(fn($query) => $user->applyStudentScope($query))
+                    ->where('organization', 'school')
+                    ->where('member_type', 'student')
+                    ->pluck('stream');
+        }
+
+        return $streams
+            ->filter()
+            ->reject(fn ($stream) => strcasecmp($stream, 'Graduated') === 0)
+            ->unique()
+            ->sort()
+            ->values();
     }
 }

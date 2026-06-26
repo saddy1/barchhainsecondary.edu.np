@@ -36,7 +36,7 @@
     <div class="flex h-dvh overflow-hidden">
         @include('hr.partials.sidebar')
 
-        <div class="relative flex flex-col flex-1 min-w-0 overflow-y-auto overflow-x-hidden">
+        <div class="relative flex flex-col flex-1 min-w-0 overflow-y-auto overflow-x-hidden" data-page-scroll-root>
             @include('backend.partials.module-header')
 
             <div class="px-4 sm:px-6 lg:px-8 pt-4 space-y-2">
@@ -53,11 +53,12 @@
             </main>
 
             <footer class="shrink-0 px-6 py-3 border-t border-gray-100 bg-white">
-                <p class="text-xs text-gray-400 text-center">&copy; {{ date('Y') }} Barchhain Secondary School — HR ERP</p>
+                <p class="text-xs text-gray-400 text-center">&copy; {{ date('Y') }} {{ $siteSettings->localized('site_name', config('app.name')) }} — HR ERP</p>
             </footer>
         </div>
     </div>
 
+    @include('partials.page-wheel-scroll')
     @stack('scripts')
 </body>
 </html>

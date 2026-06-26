@@ -44,7 +44,7 @@
                 <div>
                     <label class="block text-sm font-bold text-gray-700 mb-3">Current Photo</label>
                     <div class="rounded-2xl border border-gray-200 bg-gray-50 p-2 flex items-center justify-center h-44 overflow-hidden">
-                        <img src="{{ $siteSettings->imageUrl('home_principal_image', 'assets/image/school_building.jpg') }}"
+                        <img src="{{ $siteSettings->imageUrl('home_principal_image', 'assets/image/default-placeholder.jpg') }}"
                              alt="Principal photo" class="h-full w-full object-cover object-top rounded-xl">
                     </div>
                     <input type="file" name="home_principal_image" accept="image/png,image/jpeg,image/webp"

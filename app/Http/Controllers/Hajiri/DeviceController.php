@@ -34,8 +34,17 @@ class DeviceController extends Controller
         {
             $fileName = $file->getFileName();
             $hajiriLogs = json_decode(file_get_contents($publicDir.$fileName), true);
+            if (! is_array($hajiriLogs) || ! isset($hajiriLogs['machineInfo']) || ! is_array($hajiriLogs['machineInfo'])) {
+                unlink($publicDir.$fileName);
+                continue;
+            }
+
             foreach ($hajiriLogs['machineInfo'] as $hajiriLog)
             {
+                if (empty($hajiriLog['indRegID']) || empty($hajiriLog['dateTimeRecord'])) {
+                    continue;
+                }
+
                 $deviceID = $hajiriLog['indRegID'];
                 $dateTimeRecord = $hajiriLog['dateTimeRecord'];
                 $dateHajiri = (Carbon::parse($dateTimeRecord))->format('Y-m-d H:i:s');
@@ -51,7 +60,7 @@ class DeviceController extends Controller
                 $this->attnLogs->insertOrIgnore($hajiriDB);
             }
             unlink($publicDir.$fileName);   
-            return ['status'=>count($hajiriDB)];
+            return response()->json(['status'=>count($hajiriDB)]);
         }
 
         return response()->json(['status' => 0]);

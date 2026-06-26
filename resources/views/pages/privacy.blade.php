@@ -1,6 +1,6 @@
 @extends('layouts.app')
-@section('title', 'Privacy Policy — Barchhain Secondary School')
-@section('meta_description', 'Privacy Policy of Barchhain Secondary School. Learn how we collect, use, and protect your personal information.')
+@section('title', 'Privacy Policy')
+@section('meta_description', 'Privacy Policy. Learn how we collect, use, and protect your personal information.')
 @section('content')
 <section class="relative py-24 bg-forest-DEFAULT">
     <div class="max-w-7xl mx-auto px-4 relative">

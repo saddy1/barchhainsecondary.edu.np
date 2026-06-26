@@ -126,19 +126,22 @@
             position: absolute;
             top: 61mm;
             left: 3mm;
-            width: 48mm;
+            width: 49mm; /* full usable width; QR (z-index 5) covers any lower-row overlap */
             font-size: 6.5pt;
             line-height: 1.4;
             color: #000;
+            overflow: hidden;
         }
 
         .info-grid table {
             width: 100%;
             border-collapse: collapse;
+            table-layout: fixed;
         }
 
         .info-grid td {
             vertical-align: top;
+            overflow: hidden;
         }
 
         .info-grid td:first-child {
@@ -148,14 +151,35 @@
             width: 10mm;
         }
 
+        .info-grid td:last-child {
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 37mm;
+        }
+
         .stamp-container {
+            position: absolute;
+            top: 37mm;
+            left: 30mm;
+            width: 12mm;
+            height: 12mm;
+            opacity: 0.75;
+            z-index: 6;
+        }
+
+        .qr-container {
             position: absolute;
             bottom: 4.5mm;
             right: 2mm;
-            width: 10mm;
-            height: auto;
-            opacity: 0.85;
+            width: 13mm;
+            height: 13mm;
             z-index: 5;
+        }
+
+        .qr-container img {
+            width: 100%;
+            height: 100%;
         }
 
         .signature-container {
@@ -198,17 +222,34 @@
 <body>
 
     @php
-        // 1. Load org + department records once
-        $orgRecord = $student->organizationRecord;
-        $deptRecord = $student->departmentRecord;
+        use Illuminate\Support\Facades\Cache;
+
+        // ── Cache per-org and per-dept data; same student org reuses one DB hit ──
+        $orgRecord = Cache::remember("card_org_{$student->organization}", 300, fn() =>
+            \App\Models\Card\Organization::with(['logoAsset', 'signatureAsset', 'stampAsset'])
+                ->where('slug', $student->organization)->first()
+        );
+
+        $deptRecord = $student->stream
+            ? Cache::remember("card_dept_{$student->organization}_{$student->stream}", 300, fn() =>
+                \App\Models\Card\Department::whereHas('organization',
+                    fn($q) => $q->where('slug', $student->organization))
+                    ->where('name', $student->stream)->first()
+              )
+            : null;
 
         // 2. Resolve card background — DB-managed with hardcoded fallbacks
         $isSchool = $student->organization === 'school';
         $orgType  = $isSchool ? 'school' : 'college';
         $mtKey    = strtolower($student->member_type);
 
-        $dbBg = \Illuminate\Support\Facades\Schema::hasTable('card_backgrounds')
-            ? \App\Models\Card\CardBackground::activeFor($orgType, $mtKey)
+        // Cache Schema::hasTable (expensive info_schema call) + background record
+        $hasBgTable = Cache::remember('card_has_bg_table', 600, fn() =>
+            \Illuminate\Support\Facades\Schema::hasTable('card_backgrounds')
+        );
+        $dbBg = $hasBgTable
+            ? Cache::remember("card_bg_{$orgType}_{$mtKey}", 300, fn() =>
+                \App\Models\Card\CardBackground::activeFor($orgType, $mtKey))
             : null;
 
         if ($dbBg) {
@@ -348,6 +389,22 @@
                 implode('', $elements) .
                 '</svg>';
         }
+
+        // QR code — public verification URL, rendered as base64 PNG (works in both iframe and dompdf)
+        $qrOptions = new \chillerlan\QRCode\QROptions([
+            'outputInterface' => \chillerlan\QRCode\Output\QRGdImagePNG::class,
+            'outputBase64'    => true,
+            'scale'           => 8,
+            'quietzoneSize'   => 1,
+        ]);
+        $qrDataUri = (new \chillerlan\QRCode\QRCode($qrOptions))
+            ->render(route('student.verify', $student->id));
+
+        // Permanent employee — show "Permanent" on card instead of a valid-till date
+        // $student->employment_type accessor resolves user->employment->label as fallback
+        $empTypeLabel = $student->employment_type ?? '';
+        $isPermanent  = str_contains(strtolower($empTypeLabel), 'permanent')
+                     || str_contains($empTypeLabel, 'स्थायी');
     @endphp
 
     <div class="card" @if ($flip ?? false) style="transform: scaleX(-1);" @endif>
@@ -373,7 +430,11 @@
                 <img src="{{ $photoSrc }}" class="profile-pic" alt="Profile Photo">
             </div>
 
-            @if ($student->valid_till)
+            @if ($isPermanent)
+                <div class="valid-till-bar">
+                    <span style="font-size:12px">Permanent</span>
+                </div>
+            @elseif ($student->valid_till)
                 <div class="valid-till-bar">
                     <span style="font-size:12px">Valid Till <br> {{ $student->valid_till->format('M Y') }}</span>
                 </div>
@@ -381,38 +442,50 @@
 
             <div class="student-header">
                 <div class="student-name">{{ $student->full_name }}</div>
-                <div class="student-roll">Roll No : {{ $student->roll_number }}</div>
-                <div class="student-program">
-                     @if ($student->member_type === 'Faculty' ||    $student->member_type === 'Staff')
-                        ({{ $student->designation}})
-                    @endif
-                    @if ( $student->member_type === 'Student' )
-                        ({{ $student->program_label ?? 'N/A' }})
-                    @endif
-
-
-                   
+                <div class="student-roll">
                     @if(in_array(strtolower($student->member_type), ['staff', 'teacher']))
-                        {{ $student->designation ?? 'N/A' }}
+                        Staff ID : {{ $student->roll_number }}
                     @else
+                        Roll No : {{ $student->roll_number }}
+                    @endif
+                </div>
+                @if(in_array(strtolower($student->member_type), ['staff', 'teacher']))
+                    @if($student->designation)
+                        <div class="student-program">{{ $student->designation }}</div>
+                    @endif
+                @else
+                    <div class="student-program">
                         {{ $student->department_label ?? 'N/A' }}
                         @if ($isSchool && $student->section)
                             ({{ $student->section }})
                         @endif
-                    @endif
-                </div>
-
+                    </div>
+                @endif
             </div>
 
             <div class="info-grid" style=" margin-top: 8px;">
                 <table>
+                    {{-- Email first — sits at the top of the grid (~61mm), safely above the QR zone (~68mm).
+                         word-break overrides the td:last-child nowrap so long addresses show in full. --}}
+                    @if ($student->email)
+                        <tr>
+                            <td>Email:</td>
+                            <td>{{ $student->email }}</td>
+                        </tr>
+                    @endif
+                    @if ($student->guardian_name && !in_array(strtolower($student->member_type), ['staff', 'teacher']))
+                        <tr>
+                            <td>Guardian:</td>
+                            <td>{{ $student->guardian_name }}</td>
+                        </tr>
+                    @endif
                     @if ($student->registration_no)
                         <tr>
                             <td>Reg No:</td>
                             <td>{{ $student->registration_no }}</td>
                         </tr>
                     @endif
-                    @if ($student->dob)
+                    @if ($student->dob && !in_array(strtolower($student->member_type), ['staff', 'teacher']))
                         <tr>
                             <td>DOB:</td>
                             <td>{{ $student->dob->format('d M Y') }}</td>
@@ -424,22 +497,10 @@
                             <td>{{ $student->citizenship_no }}</td>
                         </tr>
                     @endif
-                    @if ($student->guardian_name)
-                        <tr>
-                            <td>Guardian:</td>
-                            <td>{{ $student->guardian_name }}</td>
-                        </tr>
-                    @endif
                     @if ($student->mobile)
                         <tr>
                             <td>Mobile:</td>
                             <td>{{ $student->mobile }}</td>
-                        </tr>
-                    @endif
-                    @if ($student->email)
-                        <tr>
-                            <td>Email:</td>
-                            <td>{{ $student->email }}</td>
                         </tr>
                     @endif
                     @if ($student->address_label)
@@ -456,9 +517,14 @@
                 <img src="{{ asset($signatureImage) }}" alt="Signature">
             </div>
 
-            {{-- Stamp --}}
+            {{-- Stamp — overlapping bottom-right corner of photo --}}
             <div class="stamp-container">
                 <img src="{{ asset($stampImage) }}" alt="Stamp" style="width:100%; height:auto;">
+            </div>
+
+            {{-- QR code — links to public verification page --}}
+            <div class="qr-container">
+                <img src="{{ $qrDataUri }}" alt="Verify">
             </div>
 
             @if ($barcodeSvg)

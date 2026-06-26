@@ -1,6 +1,6 @@
 @extends('layouts.app')
-@section('title', 'Terms of Service — Barchhain Secondary School')
-@section('meta_description', 'Terms of Service for the Barchhain Secondary School website.')
+@section('title', 'Terms of Service')
+@section('meta_description', 'Terms of Service for this school website.')
 @section('content')
 <section class="relative py-24 bg-forest-DEFAULT">
     <div class="max-w-7xl mx-auto px-4 relative">

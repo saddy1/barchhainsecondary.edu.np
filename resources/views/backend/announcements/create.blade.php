@@ -67,11 +67,9 @@
                     <div class="mb-6">
                         <label class="block text-sm font-bold text-gray-700 mb-2">Category *</label>
                         <select name="category" class="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-[#1a5632]">
-                            <option value="Academic">Academic</option>
-                            <option value="Admission">Admission</option>
-                            <option value="Event">Event / Festival</option>
-                            <option value="Sports">Sports</option>
-                            <option value="General">General</option>
+                            @foreach(['Academic', 'Admission', 'Event', 'Sports', 'General', 'Result', 'Calendar', 'Download', 'Resource'] as $cat)
+                                <option value="{{ $cat }}" @selected(old('category') === $cat)>{{ $cat }}</option>
+                            @endforeach
                         </select>
                     </div>
 

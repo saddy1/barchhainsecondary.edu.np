@@ -57,7 +57,13 @@
         </form>
 
         <p class="text-center text-sm text-gray-500 mt-6">
-            <a href="{{ route('vacancies') }}" class="text-[#1a5632] font-bold hover:underline">Back to vacancies</a>
+            @if(auth()->user()?->isAdmin())
+                <a href="{{ route('admin.dashboard') }}" class="text-[#1a5632] font-bold hover:underline">← Back to Dashboard</a>
+            @elseif(session('student_id'))
+                <a href="{{ route('student.dashboard') }}" class="text-[#1a5632] font-bold hover:underline">← Back to Student Portal</a>
+            @else
+                <a href="{{ url('/') }}" class="text-[#1a5632] font-bold hover:underline">← Back to Home</a>
+            @endif
         </p>
     </div>
 </div>

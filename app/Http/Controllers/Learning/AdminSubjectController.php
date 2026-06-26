@@ -11,13 +11,15 @@ class AdminSubjectController extends Controller
 {
     public function index()
     {
-        $classes = LearningClass::where('is_active', true)->orderBy('sort_order')->orderBy('name')->get();
-        $subjects = LearningSubject::with('learningClass')
-            ->orderBy('learning_class_id')
+        $classes = LearningClass::with([
+                'subjects' => fn ($query) => $query->withCount('courses')->orderBy('name'),
+            ])
+            ->where('is_active', true)
+            ->orderBy('sort_order')
             ->orderBy('name')
             ->get();
 
-        return view('learning.admin.subjects.index', compact('classes', 'subjects'));
+        return view('learning.admin.subjects.index', compact('classes'));
     }
 
     public function store(Request $request)

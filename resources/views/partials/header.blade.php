@@ -2,6 +2,58 @@
 @php
     $headerUser = auth()->user();
     $isStudentPortalSession = session()->has('student_id') || ($headerUser?->isStudent() ?? false);
+    $admissionsEnabled = \App\Services\ModuleService::enabled('admissions');
+    $vacancyEnabled = \App\Services\ModuleService::enabled('vacancy');
+    $cardEnabled = \App\Services\ModuleService::enabled('card');
+    $hajiriEnabled = \App\Services\ModuleService::enabled('hajiri');
+    $learningEnabled = \App\Services\ModuleService::enabled('learning');
+    $cmsHeaderItems = collect();
+    if (\Illuminate\Support\Facades\Schema::hasTable('cms_menus')) {
+        $cmsHeaderMenu = \App\Models\CmsMenu::whereRaw('LOWER(location) = ?', ['header'])
+            ->where('is_active', true)
+            ->with(['rootItems' => fn ($query) => $query->where('is_active', true)->with('children.page', 'page')])
+            ->first();
+        $cmsHeaderItems = $cmsHeaderMenu?->rootItems ?? collect();
+
+        $moduleControlledMenuItems = [
+            'vacancy' => ['vacancy', 'vacancies', '/vacancies', 'applicant'],
+            'admissions' => ['admission', 'admissions', '/admissions'],
+        ];
+
+        $menuItemModuleIsEnabled = function ($item) use ($moduleControlledMenuItems) {
+            $url = strtolower((string) $item->resolved_url);
+            $label = strtolower((string) $item->label);
+            $text = $label.' '.$url;
+
+            foreach ($moduleControlledMenuItems as $module => $needles) {
+                if (\App\Services\ModuleService::disabled($module)) {
+                    foreach ($needles as $needle) {
+                        if (str_contains($text, $needle)) {
+                            return false;
+                        }
+                    }
+                }
+            }
+
+            return true;
+        };
+
+        $filterMenuItems = function ($items) use (&$filterMenuItems, $menuItemModuleIsEnabled) {
+            return $items
+                ->filter($menuItemModuleIsEnabled)
+                ->map(function ($item) use (&$filterMenuItems) {
+                    if ($item->relationLoaded('children')) {
+                        $item->setRelation('children', $filterMenuItems($item->children));
+                    }
+
+                    return $item;
+                })
+                ->filter(fn ($item) => $item->resolved_url !== '#' || $item->children->isNotEmpty())
+                ->values();
+        };
+
+        $cmsHeaderItems = $filterMenuItems($cmsHeaderItems);
+    }
 @endphp
 
 <header x-data="{
@@ -37,6 +89,9 @@
             {{-- Desktop Nav --}}
             <div class="hidden lg:flex items-center gap-5 shrink-0">
 
+                @if($cmsHeaderItems->isNotEmpty())
+                    @include('partials.cms-menu-desktop', ['items' => $cmsHeaderItems])
+                @else
                 <a href="{{ url('/') }}"
                     class="text-[14px] transition-all duration-200 {{ request()->is('/') ? 'text-[#1a5632] font-bold underline' : 'text-gray-700 font-medium hover:text-[#1a5632] hover:font-bold' }}">{{ __('site.nav.home') }}</a>
 
@@ -68,8 +123,10 @@
                     </div>
                 </div>
 
-                <a href="{{ url('/admissions') }}"
-                    class="text-[14px] transition-all duration-200 {{ request()->is('admissions') ? 'text-[#1a5632] font-bold underline' : 'text-gray-700 font-medium hover:text-[#1a5632] hover:font-bold' }}">{{ __('site.nav.admissions') }}</a>
+                @if($admissionsEnabled)
+                    <a href="{{ url('/admissions') }}"
+                        class="text-[14px] transition-all duration-200 {{ request()->is('admissions') ? 'text-[#1a5632] font-bold underline' : 'text-gray-700 font-medium hover:text-[#1a5632] hover:font-bold' }}">{{ __('site.nav.admissions') }}</a>
+                @endif
 
                 <a href="{{ url('/news') }}"
                     class="text-[14px] transition-all duration-200 {{ request()->is('news') ? 'text-[#1a5632] font-bold underline' : 'text-gray-700 font-medium hover:text-[#1a5632] hover:font-bold' }}">{{ __('site.nav.news') }}</a>
@@ -78,6 +135,7 @@
                     class="text-[14px] transition-all duration-200 {{ request()->is('gallery') ? 'text-[#1a5632] font-bold underline' : 'text-gray-700 font-medium hover:text-[#1a5632] hover:font-bold' }}">{{ __('site.nav.gallery') }}</a>
 
                 {{-- Vacancies Dropdown --}}
+                @if($vacancyEnabled)
                 <div class="relative" @mouseenter="vacanciesOpen = true" @mouseleave="vacanciesOpen = false">
                     <button class="flex items-center gap-1 text-[14px] transition-all duration-200 outline-none {{ request()->is('vacancies*') ? 'text-[#1a5632] font-bold underline' : 'text-gray-700 font-medium hover:text-[#1a5632] hover:font-bold' }}">
                         {{ __('site.nav.vacancies') }}
@@ -109,6 +167,7 @@
                         </div>
                     </div>
                 </div>
+                @endif
 
                 {{-- About Dropdown --}}
                 <div class="relative" @mouseenter="aboutOpen = true" @mouseleave="aboutOpen = false">
@@ -137,13 +196,14 @@
                         </div>
                     </div>
                 </div>
+                @endif
 
                 <div class="flex items-center gap-1 rounded-full bg-gray-100 p-1 text-xs font-bold" aria-label="{{ __('site.language.switch') }}">
-                    <a href="{{ route('language.switch', 'en') }}"
+                    <a href="{{ route('language.switch', ['locale' => 'en', 'redirect' => url()->full()]) }}"
                        class="rounded-full px-2.5 py-1 transition-colors {{ app()->getLocale() === 'en' ? 'theme-bg-primary text-white shadow-sm' : 'text-gray-600 hover:text-[#1a5632]' }}">
                         EN
                     </a>
-                    <a href="{{ route('language.switch', 'ne') }}"
+                    <a href="{{ route('language.switch', ['locale' => 'ne', 'redirect' => url()->full()]) }}"
                        class="rounded-full px-2.5 py-1 transition-colors {{ app()->getLocale() === 'ne' ? 'theme-bg-primary text-white shadow-sm' : 'text-gray-600 hover:text-[#1a5632]' }}">
                         ने
                     </a>
@@ -171,17 +231,22 @@
                             <div class="p-2">
                                 @if($headerUser?->isAdmin())
                                     <a href="{{ route('admin.dashboard') }}" class="block rounded-lg px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-green-50 hover:text-[#1a5632]">{{ __('site.nav.admin_dashboard') }}</a>
-                                    <a href="{{ route('hajiri.home') }}" class="block rounded-lg px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-green-50 hover:text-[#1a5632]">{{ __('site.nav.hajiri_module') }}</a>
+                                    @if($hajiriEnabled)
+                                        <a href="{{ route('hajiri.home') }}" class="block rounded-lg px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-green-50 hover:text-[#1a5632]">{{ __('site.nav.hajiri_module') }}</a>
+                                    @endif
                                 @elseif($isStudentPortalSession)
                                     <a href="{{ route('student.dashboard') }}" class="block rounded-lg px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-green-50 hover:text-[#1a5632]">{{ __('site.nav.student_portal') }}</a>
-                                    <a href="{{ route('student.learning') }}" class="block rounded-lg px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-green-50 hover:text-[#1a5632]">E-Learning</a>
-                                    <a href="{{ route('student.card-status') }}" class="block rounded-lg px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-green-50 hover:text-[#1a5632]">ID Card Request</a>
-                                @elseif($headerUser?->device_id)
+                                    @if($cardEnabled)
+                                        <a href="{{ route('student.card-status') }}" class="block rounded-lg px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-green-50 hover:text-[#1a5632]">ID Card Request</a>
+                                    @endif
+                                @elseif($headerUser?->device_id && $hajiriEnabled)
                                     <a href="{{ route('hajiri.home') }}" class="block rounded-lg px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-green-50 hover:text-[#1a5632]">{{ __('site.nav.my_dashboard') }}</a>
                                     <a href="{{ route('hajiri.my-leaves') }}" class="block rounded-lg px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-green-50 hover:text-[#1a5632]">{{ __('site.nav.my_leaves') }}</a>
                                 @else
                                     <a href="{{ route('account.applications.index') }}" class="block rounded-lg px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-green-50 hover:text-[#1a5632]">{{ __('site.nav.my_applications') }}</a>
-                                    <a href="{{ route('vacancies') }}" class="block rounded-lg px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-green-50 hover:text-[#1a5632]">{{ __('site.nav.open_vacancies') }}</a>
+                                    @if($vacancyEnabled)
+                                        <a href="{{ route('vacancies') }}" class="block rounded-lg px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-green-50 hover:text-[#1a5632]">{{ __('site.nav.open_vacancies') }}</a>
+                                    @endif
                                 @endif
                                 @unless($isStudentPortalSession)
                                     <a href="{{ route('account.password.edit') }}" class="block rounded-lg px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-green-50 hover:text-[#1a5632]">{{ __('site.nav.change_password') }}</a>
@@ -217,6 +282,7 @@
                                         <div class="text-xs text-gray-400">{{ __('site.nav.staff_portal_sub') }}</div>
                                     </div>
                                 </a>
+                                @if($cardEnabled)
                                 <a href="/student/card/login" class="flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-blue-50 transition-colors group">
                                     <div class="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center shrink-0">
                                         <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 14l9-5-9-5-9 5 9 5zm0 0l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z"/></svg>
@@ -226,6 +292,7 @@
                                         <div class="text-xs text-gray-400">{{ __('site.nav.student_portal_sub') }}</div>
                                     </div>
                                 </a>
+                                @endif
                             </div>
                         </div>
                     </div>
@@ -255,7 +322,7 @@
                 <span class="hidden sm:inline">{{ __('site.notice') }}</span>
             </div>
 
-            <div class="flex-1 overflow-hidden relative py-1.5" style="min-width:0;">
+            <div class="flex-1 overflow-hidden relative py-1.5 ticker-viewport" style="min-width:0;">
                 <div class="absolute left-0 top-0 bottom-0 w-6 sm:w-8 z-10 pointer-events-none" style="background: linear-gradient(to right, var(--theme-notice-bg, #1a5632), transparent);"></div>
                 <div class="absolute right-0 top-0 bottom-0 w-6 sm:w-8 z-10 pointer-events-none" style="background: linear-gradient(to left, var(--theme-header-gradient-end, #0f3d22), transparent);"></div>
                 <div class="ticker-wrapper flex items-center whitespace-nowrap">
@@ -263,7 +330,7 @@
                         @foreach ($notices ?? [] as $notice)
                             <a href="{{ route('news.show', $notice->slug) }}" class="inline-flex items-center gap-2 sm:gap-3 px-4 sm:px-6 group cursor-pointer min-h-0">
                                 <span class="w-1.5 h-1.5 rounded-full shrink-0 opacity-70" style="background-color: var(--theme-notice-accent, #e2a024);"></span>
-                                <span class="text-white text-xs font-medium group-hover:opacity-80 transition-opacity duration-200">{{ $notice->title }}</span>
+                                <span class="max-w-[42vw] truncate rounded-full bg-white/10 px-2.5 py-0.5 text-xs font-semibold text-white ring-1 ring-white/10 transition-colors duration-200 group-hover:bg-white/20 sm:max-w-none">{{ $notice->title }}</span>
                                 <span class="hidden sm:inline text-[10px] font-semibold text-white/50 bg-white/10 px-2 py-0.5 rounded-full shrink-0 transition-colors duration-200">{{ $notice->created_at->diffForHumans() }}</span>
                             </a>
                         @endforeach
@@ -272,7 +339,7 @@
                         @foreach ($notices ?? [] as $notice)
                             <a href="{{ route('news.show', $notice->slug) }}" class="inline-flex items-center gap-2 sm:gap-3 px-4 sm:px-6 group cursor-pointer min-h-0">
                                 <span class="w-1.5 h-1.5 rounded-full shrink-0 opacity-70" style="background-color: var(--theme-notice-accent, #e2a024);"></span>
-                                <span class="text-white text-xs font-medium group-hover:opacity-80 transition-opacity duration-200">{{ $notice->title }}</span>
+                                <span class="max-w-[42vw] truncate rounded-full bg-white/10 px-2.5 py-0.5 text-xs font-semibold text-white ring-1 ring-white/10 transition-colors duration-200 group-hover:bg-white/20 sm:max-w-none">{{ $notice->title }}</span>
                                 <span class="hidden sm:inline text-[10px] font-semibold text-white/50 bg-white/10 px-2 py-0.5 rounded-full shrink-0 transition-colors duration-200">{{ $notice->created_at->diffForHumans() }}</span>
                             </a>
                         @endforeach
@@ -313,6 +380,9 @@
 
         {{-- Drawer Links --}}
         <div class="flex-1 overflow-y-auto px-4 py-4 space-y-1">
+            @if($cmsHeaderItems->isNotEmpty())
+                @include('partials.cms-menu-mobile', ['items' => $cmsHeaderItems])
+            @else
             <a href="{{ url('/') }}"
                 class="block px-4 py-3 rounded-xl transition-all {{ request()->is('/') ? 'text-[#1a5632] bg-green-50 font-bold' : 'text-gray-700 font-medium hover:bg-gray-50' }} text-base">{{ __('site.nav.home') }}</a>
 
@@ -329,14 +399,17 @@
                 </div>
             </div>
 
-            <a href="{{ url('/admissions') }}"
-                class="block px-4 py-3 rounded-xl transition-all {{ request()->is('admissions') ? 'text-[#1a5632] bg-green-50 font-bold' : 'text-gray-700 font-medium hover:bg-gray-50' }} text-base">{{ __('site.nav.admissions') }}</a>
+            @if($admissionsEnabled)
+                <a href="{{ url('/admissions') }}"
+                    class="block px-4 py-3 rounded-xl transition-all {{ request()->is('admissions') ? 'text-[#1a5632] bg-green-50 font-bold' : 'text-gray-700 font-medium hover:bg-gray-50' }} text-base">{{ __('site.nav.admissions') }}</a>
+            @endif
             <a href="{{ url('/news') }}"
                 class="block px-4 py-3 rounded-xl transition-all {{ request()->is('news') ? 'text-[#1a5632] bg-green-50 font-bold' : 'text-gray-700 font-medium hover:bg-gray-50' }} text-base">{{ __('site.nav.news_events') }}</a>
             <a href="{{ url('/gallery') }}"
                 class="block px-4 py-3 rounded-xl transition-all {{ request()->is('gallery') ? 'text-[#1a5632] bg-green-50 font-bold' : 'text-gray-700 font-medium hover:bg-gray-50' }} text-base">{{ __('site.nav.gallery') }}</a>
 
             {{-- Vacancies Accordion --}}
+            @if($vacancyEnabled)
             <div x-data="{ open: {{ request()->is('vacancies*') ? 'true' : 'false' }} }">
                 <button @click="open = !open" class="w-full flex items-center justify-between px-4 py-3 rounded-xl text-gray-700 font-medium hover:bg-gray-50 text-base">
                     <span :class="open ? 'text-[#1a5632] font-bold' : ''">{{ __('site.nav.vacancies') }}</span>
@@ -349,6 +422,7 @@
                     @endguest
                 </div>
             </div>
+            @endif
 
             {{-- About Accordion --}}
             <div x-data="{ open: {{ request()->is('about') || request()->is('contact') || request()->is('faculty') ? 'true' : 'false' }} }">
@@ -362,16 +436,17 @@
                     <a href="{{ url('/contact') }}" class="block px-4 py-2 rounded-lg text-sm text-gray-600 hover:text-[#1a5632] hover:bg-green-50 transition-colors">{{ __('site.nav.contact') }}</a>
                 </div>
             </div>
+            @endif
 
             {{-- Portals section (mobile) --}}
             <div class="pt-2 mt-2 border-t border-gray-100">
                 <p class="px-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">{{ __('site.language.switch') }}</p>
                 <div class="mx-4 grid grid-cols-2 gap-2">
-                    <a href="{{ route('language.switch', 'en') }}"
+                    <a href="{{ route('language.switch', ['locale' => 'en', 'redirect' => url()->full()]) }}"
                        class="rounded-xl py-2.5 text-center text-sm font-bold transition-colors {{ app()->getLocale() === 'en' ? 'bg-[#1a5632] text-white' : 'bg-gray-100 text-gray-700' }}">
                         English
                     </a>
-                    <a href="{{ route('language.switch', 'ne') }}"
+                    <a href="{{ route('language.switch', ['locale' => 'ne', 'redirect' => url()->full()]) }}"
                        class="rounded-xl py-2.5 text-center text-sm font-bold transition-colors {{ app()->getLocale() === 'ne' ? 'bg-[#1a5632] text-white' : 'bg-gray-100 text-gray-700' }}">
                         नेपाली
                     </a>
@@ -385,10 +460,12 @@
                     <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
                     {{ __('site.nav.staff_portal') }}
                 </a>
+                @if($cardEnabled)
                 <a href="/student/card/login" class="flex items-center gap-3 px-4 py-3 rounded-xl bg-blue-50 text-blue-700 font-bold text-sm hover:bg-blue-100 transition-colors">
                     <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 14l9-5-9-5-9 5 9 5zm0 0l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z"/></svg>
                     {{ __('site.nav.student_portal') }}
                 </a>
+                @endif
             </div>
             @endguest
         </div>
@@ -410,7 +487,7 @@
                         <a href="{{ route('admin.dashboard') }}" class="rounded-xl bg-[#1a5632] py-3 text-center text-xs font-bold text-white hover:bg-[#0b2415] transition-colors">{{ __('site.nav.admin_panel') }}</a>
                     @elseif($isStudentPortalSession)
                         <a href="{{ route('student.dashboard') }}" class="rounded-xl bg-[#1a5632] py-3 text-center text-xs font-bold text-white hover:bg-[#0b2415] transition-colors">{{ __('site.nav.student_portal') }}</a>
-                    @elseif($headerUser?->device_id)
+                    @elseif($headerUser?->device_id && $hajiriEnabled)
                         <a href="{{ route('hajiri.home') }}" class="rounded-xl bg-[#1a5632] py-3 text-center text-xs font-bold text-white hover:bg-[#0b2415] transition-colors">{{ __('site.nav.my_dashboard') }}</a>
                     @else
                         <a href="{{ route('account.applications.index') }}" class="rounded-xl bg-gray-100 py-3 text-center text-xs font-bold text-gray-700 hover:bg-gray-200 transition-colors">{{ __('site.nav.applications') }}</a>
@@ -436,7 +513,11 @@
     .ticker-wrapper {
         display: flex;
         width: max-content;
-        animation: ticker-scroll 40s linear infinite;
+        animation: ticker-scroll 26s linear infinite;
+    }
+    .ticker-viewport {
+        mask-image: linear-gradient(to right, transparent, black 36px, black calc(100% - 36px), transparent);
+        -webkit-mask-image: linear-gradient(to right, transparent, black 36px, black calc(100% - 36px), transparent);
     }
     .ticker-wrapper:hover { animation-play-state: paused; }
     .ticker-track { display: flex; align-items: center; }

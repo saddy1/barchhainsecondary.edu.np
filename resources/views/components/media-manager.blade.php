@@ -1,6 +1,6 @@
 {{-- resources/views/components/media-manager.blade.php --}}
 <div x-data="mediaManager()" 
-     @open-media-manager.window="isOpen = true; fetchMedia()"
+     @open-media-manager.window="isOpen = true; request = $event.detail || {}; fetchMedia()"
      x-show="isOpen" 
      style="display: none;" 
      class="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 sm:p-6"
@@ -83,6 +83,7 @@ function mediaManager() {
         isLoading: false,
         isUploading: false,
         selectedImage: null,
+        request: {},
 
         fetchMedia() {
             this.isLoading = true;
@@ -127,7 +128,10 @@ function mediaManager() {
             
             // Dispatch a custom event with the selected image URL
             window.dispatchEvent(new CustomEvent('image-selected', { 
-                detail: this.selectedImage 
+                detail: {
+                    image: this.selectedImage,
+                    request: this.request
+                }
             }));
             
             this.isOpen = false; // Close modal

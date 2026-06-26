@@ -2,15 +2,20 @@
 
 use App\Http\Controllers\Card\BulkCardController;
 use App\Http\Controllers\Card\CardController;
-use App\Http\Controllers\Card\ImportController;
-use App\Http\Controllers\Card\PromoteController;
 use App\Http\Controllers\Card\SettingsController;
 use App\Http\Controllers\Card\StudentAuthController;
 use App\Http\Controllers\Card\StudentController;
 use App\Http\Controllers\Card\StudentPortalController;
+use App\Http\Controllers\Card\StudentVerificationController;
+use App\Http\Controllers\Hr\CertificateController;
 use Illuminate\Support\Facades\Route;
 
-Route::prefix('admin/id-card')->middleware(['auth', 'admin', 'module.enabled:card'])->group(function () {
+// Public card verification — no auth required
+Route::get('/verify/student/{student}', [StudentVerificationController::class, 'show'])
+    ->middleware('module.enabled:card')
+    ->name('student.verify');
+
+Route::prefix('admin/students')->middleware(['auth', 'admin', 'module.enabled:card'])->group(function () {
     Route::get('/', function () {
         $user = auth()->user();
 
@@ -30,7 +35,7 @@ Route::prefix('admin/id-card')->middleware(['auth', 'admin', 'module.enabled:car
             return redirect()->route('settings.index');
         }
 
-        abort(403, 'You do not have permission to access the ID Card module. Please ask Super Admin for permission.');
+        abort(403, 'You do not have permission to access the Student module. Please ask Super Admin for permission.');
     })->name('card.dashboard');
 
     Route::get('/students', [StudentController::class, 'index'])->middleware('permission:students.view')->name('students.index');
@@ -47,17 +52,15 @@ Route::prefix('admin/id-card')->middleware(['auth', 'admin', 'module.enabled:car
     Route::post('/students/bulk-learning-accounts', [StudentController::class, 'bulkLearningAccounts'])->middleware('permission:students.edit')->name('students.bulk-learning-accounts');
     Route::post('/students/bulk-delete', [StudentController::class, 'bulkDestroy'])->middleware('permission:students.delete')->name('students.bulk-destroy');
 
-    Route::prefix('import')->name('import.')->middleware('permission:users.bulk-import')->group(function () {
-        Route::get('/', [ImportController::class, 'index'])->name('index');
-        Route::post('/csv/preview', [ImportController::class, 'previewCsv'])->name('csv.preview');
-        Route::post('/csv/confirm', [ImportController::class, 'confirmCsv'])->name('csv.confirm');
-        Route::post('/photos/preview', [ImportController::class, 'previewPhotos'])->name('photos.preview');
-        Route::post('/photos/confirm', [ImportController::class, 'confirmPhotos'])->name('photos.confirm');
-        Route::get('/template', [ImportController::class, 'downloadTemplate'])->name('template');
-    });
+    // Certificates
+    Route::get('/certificates', [CertificateController::class, 'index'])->middleware('permission:hr.certificates.view')->name('certificates.index');
+    Route::get('/certificates/students/search', [CertificateController::class, 'searchStudents'])->middleware('permission:hr.certificates.create')->name('certificates.students.search');
+    Route::get('/certificates/create', [CertificateController::class, 'create'])->middleware('permission:hr.certificates.create')->name('certificates.create');
+    Route::post('/certificates', [CertificateController::class, 'store'])->middleware('permission:hr.certificates.create')->name('certificates.store');
+    Route::get('/certificates/{certificate}/print', [CertificateController::class, 'print'])->middleware('permission:hr.certificates.view')->name('certificates.print');
+    Route::get('/certificates/{certificate}', [CertificateController::class, 'show'])->middleware('permission:hr.certificates.view')->name('certificates.show');
+    Route::delete('/certificates/{certificate}', [CertificateController::class, 'destroy'])->middleware('permission:hr.certificates.delete')->name('certificates.destroy');
 
-    Route::get('/promote', [PromoteController::class, 'index'])->middleware('permission:students.edit')->name('promote.index');
-    Route::post('/promote', [PromoteController::class, 'promote'])->middleware('permission:students.edit')->name('promote.apply');
 
     Route::prefix('cards/{student}')->name('cards.')->middleware('permission:cards.view,cards.print')->group(function () {
         Route::get('preview/{type}', [CardController::class, 'preview'])->name('preview');
@@ -72,6 +75,7 @@ Route::prefix('admin/id-card')->middleware(['auth', 'admin', 'module.enabled:car
         Route::get('/', [BulkCardController::class, 'index'])->name('index');
         Route::post('preview', [BulkCardController::class, 'preview'])->name('preview');
         Route::post('generate', [BulkCardController::class, 'generate'])->name('generate');
+        Route::post('mark-printed', [BulkCardController::class, 'markPrinted'])->name('mark-printed');
     });
 
     Route::prefix('requests')->name('admin.')->middleware('permission:students.card-request')->group(function () {
@@ -106,11 +110,15 @@ Route::prefix('admin/id-card')->middleware(['auth', 'admin', 'module.enabled:car
 
 });
 
-Route::get('/student/card/login', [StudentAuthController::class, 'showLogin'])->name('student.login');
-Route::post('/student/card/login', [StudentAuthController::class, 'login'])->name('student.login.post');
-Route::post('/student/card/logout', [StudentAuthController::class, 'logout'])->name('student.logout');
+Route::get('admin/id-card/{path?}', function (?string $path = null) {
+    return redirect('admin/students' . ($path ? '/' . $path : ''));
+})->where('path', '.*')->middleware(['auth', 'admin', 'module.enabled:card']);
 
-Route::middleware('card.student')->prefix('student/card')->name('student.')->group(function () {
+Route::get('/student/card/login', [StudentAuthController::class, 'showLogin'])->middleware('module.enabled:card')->name('student.login');
+Route::post('/student/card/login', [StudentAuthController::class, 'login'])->middleware('module.enabled:card')->name('student.login.post');
+Route::post('/student/card/logout', [StudentAuthController::class, 'logout'])->middleware('module.enabled:card')->name('student.logout');
+
+Route::middleware(['card.student', 'module.enabled:card'])->prefix('student/card')->name('student.')->group(function () {
     Route::get('/dashboard', [StudentPortalController::class, 'dashboard'])->name('dashboard');
     Route::get('/learning', [StudentPortalController::class, 'learning'])->name('learning');
     Route::get('/card-status', [StudentPortalController::class, 'cardStatus'])->name('card-status');
@@ -120,4 +128,8 @@ Route::middleware('card.student')->prefix('student/card')->name('student.')->gro
     Route::post('/photo', [StudentPortalController::class, 'uploadPhoto'])->name('upload-photo');
     Route::get('/request-update', [StudentPortalController::class, 'requestUpdateForm'])->name('request-update');
     Route::post('/request-update', [StudentPortalController::class, 'submitUpdate'])->name('submit-update');
+    Route::get('/books/search', [\App\Http\Controllers\Backend\LibraryController::class, 'publicSearch'])->name('books.search');
+    Route::get('/library', [StudentPortalController::class, 'myLibrary'])->name('library');
+    Route::get('/change-password', [StudentPortalController::class, 'changePasswordForm'])->name('change-password');
+    Route::post('/change-password', [StudentPortalController::class, 'changePassword'])->name('change-password.update');
 });

@@ -55,13 +55,24 @@
                     class="w-full sm:w-auto border border-gray-200 rounded-lg px-3 py-2 text-sm
                            focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-transparent"></select>
 
+            {{-- Per-page selector: auto-submits so page resets to 1 --}}
+            <select name="per_page" onchange="this.form.submit()"
+                    class="w-full sm:w-auto border border-gray-200 rounded-lg px-3 py-2 text-sm
+                           focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-transparent">
+                <option value="10"  @selected(request('per_page') === '10')>10 / page</option>
+                <option value="20"  @selected(request('per_page', '20') === '20')>20 / page</option>
+                <option value="40"  @selected(request('per_page') === '40')>40 / page</option>
+                <option value="100" @selected(request('per_page') === '100')>100 / page</option>
+                <option value="all" @selected(request('per_page') === 'all')>All</option>
+            </select>
+
             <button type="submit"
                     class="w-full sm:w-auto bg-primary text-white px-4 py-2 rounded-lg text-sm
                            hover:bg-primary-light transition font-medium">
                 Search
             </button>
 
-            @if(request('search') || request('type') || request('stream') || request('section'))
+            @if(request('search') || request('type') || request('stream') || request('section') || request('per_page'))
             <a href="{{ route('students.index') }}"
                class="w-full sm:w-auto text-center px-4 py-2 rounded-lg text-sm text-gray-500 hover:bg-gray-100 transition">
                 Clear
@@ -70,18 +81,7 @@
         </form>
 
         <div class="flex gap-2 flex-shrink-0 flex-wrap w-full xl:w-auto">
-            @if(auth()->user()->isSuperAdmin() || auth()->user()->organizationSlug() === 'school')
-                <a href="{{ route('promote.index') }}"
-                   class="flex flex-1 sm:flex-none items-center justify-center gap-2 bg-orange-500 text-white font-semibold
-                          px-4 py-2 rounded-lg text-sm hover:bg-orange-600 transition">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                              d="M5 10l7-7m0 0l7 7m-7-7v18"/>
-                    </svg>
-                    Promote
-                </a>
-            @endif
-            <a href="{{ route('import.index') }}"
+            <a href="{{ route('admin.hr.members.import') }}"
                class="flex flex-1 sm:flex-none items-center justify-center gap-2 bg-emerald-600 text-white font-semibold
                       px-4 py-2 rounded-lg text-sm hover:bg-emerald-700 transition">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -290,16 +290,6 @@
                             <span class="text-xs bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full border border-blue-100 font-medium">
                                 ID
                             </span>
-                            @if($student->has_library_card)
-                            <span class="text-xs bg-emerald-50 text-emerald-600 px-2 py-0.5 rounded-full border border-emerald-100 font-medium">
-                                Library
-                            </span>
-                            @endif
-                            @if($student->has_bus_pass)
-                            <span class="text-xs bg-orange-50 text-orange-600 px-2 py-0.5 rounded-full border border-orange-100 font-medium">
-                                Bus
-                            </span>
-                            @endif
                             @if($student->user_id)
                             <span class="text-xs bg-green-50 text-green-600 px-2 py-0.5 rounded-full border border-green-100 font-medium">
                                 Learning
@@ -310,77 +300,20 @@
 
                     {{-- ── Print Preview column ────────────────────── --}}
                     <td class="px-4 py-3.5">
-                        <div class="flex flex-wrap items-center gap-1.5">
-
-                            {{-- Print ID card --}}
-                            <a href="{{ route('cards.print', [$student, 'id']) }}"
-                               target="_blank"
-                               title="Print Preview — ID Card"
-                               class="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium
-                                      bg-blue-50 text-blue-600 hover:bg-blue-100 border border-blue-100
-                                      transition whitespace-nowrap">
-                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                          d="M17 17h2a2 2 0 0 0 2-2v-4a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v4
-                                             a2 2 0 0 0 2 2h2m2 4h6a2 2 0 0 0 2-2v-4a2 2 0 0 0-2-2H9
-                                             a2 2 0 0 0-2 2v4a2 2 0 0 0 2 2z"/>
-                                </svg>
-                                ID
-                            </a>
-
-                            {{-- Print Library card --}}
-                            @if($student->has_library_card)
-                            <a href="{{ route('cards.print', [$student, 'library']) }}"
-                               target="_blank"
-                               title="Print Preview — Library Card"
-                               class="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium
-                                      bg-emerald-50 text-emerald-600 hover:bg-emerald-100 border border-emerald-100
-                                      transition whitespace-nowrap">
-                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                          d="M17 17h2a2 2 0 0 0 2-2v-4a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v4
-                                             a2 2 0 0 0 2 2h2m2 4h6a2 2 0 0 0 2-2v-4a2 2 0 0 0-2-2H9
-                                             a2 2 0 0 0-2 2v4a2 2 0 0 0 2 2z"/>
-                                </svg>
-                                Lib
-                            </a>
-                            @endif
-
-                            {{-- Print Bus pass --}}
-                            @if($student->has_bus_pass)
-                            <a href="{{ route('cards.print', [$student, 'bus']) }}"
-                               target="_blank"
-                               title="Print Preview — Bus Pass"
-                               class="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium
-                                      bg-orange-50 text-orange-600 hover:bg-orange-100 border border-orange-100
-                                      transition whitespace-nowrap">
-                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                          d="M17 17h2a2 2 0 0 0 2-2v-4a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v4
-                                             a2 2 0 0 0 2 2h2m2 4h6a2 2 0 0 0 2-2v-4a2 2 0 0 0-2-2H9
-                                             a2 2 0 0 0-2 2v4a2 2 0 0 0 2 2z"/>
-                                </svg>
-                                Bus
-                            </a>
-                            @endif
-
-                            {{-- Print ALL cards --}}
-                            <a href="{{ route('cards.print-all', $student) }}"
-                               target="_blank"
-                               title="Print Preview — All Cards"
-                               class="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-semibold
-                                      bg-primary text-white hover:bg-primary-light border border-primary
-                                      transition whitespace-nowrap">
-                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                          d="M17 17h2a2 2 0 0 0 2-2v-4a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v4
-                                             a2 2 0 0 0 2 2h2m2 4h6a2 2 0 0 0 2-2v-4a2 2 0 0 0-2-2H9
-                                             a2 2 0 0 0-2 2v4a2 2 0 0 0 2 2z"/>
-                                </svg>
-                                All
-                            </a>
-
-                        </div>
+                        <a href="{{ route('cards.print', [$student, 'id']) }}"
+                           target="_blank"
+                           title="Print Preview — ID Card"
+                           class="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium
+                                  bg-blue-50 text-blue-600 hover:bg-blue-100 border border-blue-100
+                                  transition whitespace-nowrap">
+                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                      d="M17 17h2a2 2 0 0 0 2-2v-4a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v4
+                                         a2 2 0 0 0 2 2h2m2 4h6a2 2 0 0 0 2-2v-4a2 2 0 0 0-2-2H9
+                                         a2 2 0 0 0-2 2v4a2 2 0 0 0 2 2z"/>
+                            </svg>
+                            Print ID Card
+                        </a>
                     </td>
 
                     {{-- ── Actions column ──────────────────────────── --}}
@@ -398,8 +331,8 @@
                                 </svg>
                             </a>
 
-                            {{-- Edit --}}
-                            <a href="{{ route('students.edit', $student) }}"
+                            {{-- Edit — managed in HR --}}
+                            <a href="{{ route('admin.hr.members.edit', $student) }}"
                                title="Edit Member"
                                class="p-1.5 rounded-md bg-gray-100 text-gray-600 hover:bg-gray-200 transition">
                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -456,12 +389,18 @@
     </div>
 
     {{-- ── Pagination ──────────────────────────────────────────────── --}}
-    @if($students->hasPages())
     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 text-sm text-gray-500">
-        <p>Showing {{ $students->firstItem() }}–{{ $students->lastItem() }} of {{ $students->total() }} members</p>
+        <p>
+            @if($students->total() > 0)
+                Showing {{ $students->firstItem() }}–{{ $students->lastItem() }} of {{ $students->total() }} members
+            @else
+                No members found
+            @endif
+        </p>
+        @if($students->hasPages())
         <div>{{ $students->links() }}</div>
+        @endif
     </div>
-    @endif
 
 </div>
 @endsection

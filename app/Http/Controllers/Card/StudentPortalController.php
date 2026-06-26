@@ -10,7 +10,11 @@ use App\Models\Card\UpdateRequest;
 use App\Models\Learning\LearningCourse;
 use App\Models\Learning\LearningResource;
 use App\Models\Learning\LearningProgress;
+use App\Models\LibraryLoan;
+use App\Models\LibraryNotification;
+use App\Support\SiteSettings;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Schema;
 
 class StudentPortalController extends Controller
 {
@@ -49,7 +53,37 @@ class StudentPortalController extends Controller
             ->when($student->stream, fn ($query) => $query->whereHas('learningClass', fn ($classQuery) => $classQuery->where('name', $student->stream)))
             ->count();
 
-        return view('card.student-portal.dashboard', compact('student', 'cardRequest', 'updateRequest', 'courseCount', 'resourceCount'));
+        // Library data (only if module exists)
+        $libraryIssuedCount  = 0;
+        $libraryOverdueCount = 0;
+        $libraryFineOwed     = 0;
+        $libraryNotifCount   = 0;
+        $libraryActiveLoans  = collect();
+
+        if (Schema::hasTable('library_loans')) {
+            $userId = $student->user_id;
+            $baseQuery = fn () => LibraryLoan::where(function ($q) use ($student, $userId) {
+                $q->where('student_id', $student->id);
+                if ($userId) {
+                    $q->orWhere('user_id', $userId);
+                }
+            });
+
+            $libraryActiveLoans  = (clone $baseQuery())->with('copy.book')->where('status', 'issued')->latest('issued_at')->get();
+            $libraryIssuedCount  = $libraryActiveLoans->count();
+            $libraryOverdueCount = $libraryActiveLoans->filter(fn ($l) => $l->due_date && $l->due_date->isPast())->count();
+            $libraryFineOwed     = $libraryActiveLoans->sum(fn ($l) => $l->accrued_fine);
+            $libraryActiveLoans  = $libraryActiveLoans->take(3);
+
+            if ($userId && Schema::hasTable('library_notifications')) {
+                $libraryNotifCount = LibraryNotification::where('user_id', $userId)->where('is_read', false)->count();
+            }
+        }
+
+        return view('card.student-portal.dashboard', compact(
+            'student', 'cardRequest', 'updateRequest', 'courseCount', 'resourceCount',
+            'libraryIssuedCount', 'libraryOverdueCount', 'libraryFineOwed', 'libraryNotifCount', 'libraryActiveLoans'
+        ));
     }
 
     public function learning()
@@ -297,5 +331,49 @@ class StudentPortalController extends Controller
         }
 
         return back()->with('success', 'Update request ' . $request->action . 'd successfully.');
+    }
+
+    public function myLibrary()
+    {
+        $student = $this->getStudent();
+        $userId  = $student->user_id;
+
+        $baseQuery = fn () => LibraryLoan::where(function ($q) use ($student, $userId) {
+            $q->where('student_id', $student->id);
+            if ($userId) {
+                $q->orWhere('user_id', $userId);
+            }
+        });
+
+        $activeLoans  = (clone $baseQuery())->with('copy.book')->where('status', 'issued')->orderBy('due_date')->get();
+        $historyLoans = (clone $baseQuery())->with('copy.book')->where('status', 'returned')->latest('returned_at')->paginate(10)->withQueryString();
+        $overdueCount = $activeLoans->filter(fn ($l) => $l->due_date && $l->due_date->isPast())->count();
+        $fineOwed     = $activeLoans->sum(fn ($l) => $l->accrued_fine);
+
+        // Mark notifications as read
+        if ($userId && \Illuminate\Support\Facades\Schema::hasTable('library_notifications')) {
+            \App\Models\LibraryNotification::where('user_id', $userId)->where('is_read', false)->update(['is_read' => true]);
+        }
+
+        return view('card.student-portal.library', compact('student', 'activeLoans', 'historyLoans', 'overdueCount', 'fineOwed'));
+    }
+
+    public function changePasswordForm()
+    {
+        return view('card.student-portal.change-password');
+    }
+
+    public function changePassword(Request $request)
+    {
+        $request->validate([
+            'current_password'      => ['required', 'current_password'],
+            'password'              => ['required', 'confirmed', \Illuminate\Validation\Rules\Password::min(8)],
+        ]);
+
+        $request->user()->update([
+            'password' => \Illuminate\Support\Facades\Hash::make($request->password),
+        ]);
+
+        return back()->with('success', 'Password changed successfully.');
     }
 }

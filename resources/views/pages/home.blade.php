@@ -11,18 +11,16 @@
 <style>
 /* ─── ROOT TOKENS ─────────────────────────────────── */
 :root {
-    --forest:   #1a5632;
-    --forest-d: #0b2415;
-    --forest-l: #2a7a48;
-    --gold:     #e2a024;
-    --gold-l:   #f5c355;
-    --gold-d:   #b87e15;
-    --cream:    #fdfbf7;
-    --ash:      #f4f5f0;
-    --ink:      #111714;
-    --mist:     #6b7c72;
-    --ff-head:  'Playfair Display', Georgia, serif;
-    --ff-body:  'DM Sans', sans-serif;
+    --forest:   var(--theme-primary);
+    --forest-d: var(--theme-dark);
+    --forest-l: var(--theme-primary-light);
+    --gold:     var(--theme-secondary);
+    --gold-l:   var(--theme-secondary-light);
+    --gold-d:   var(--theme-secondary);
+    --cream:    var(--theme-surface);
+    --ash:      var(--theme-muted-surface);
+    --ink:      #111827;
+    --mist:     var(--theme-muted-text);
 }
 body { font-family: var(--ff-body); }
 
@@ -335,6 +333,8 @@ body { font-family: var(--ff-body); }
 {{-- ═══════════════════════════════════════════════════════
      HERO
 ═══════════════════════════════════════════════════════ --}}
+@include('pages.partials.home-portal')
+@if(false)
 <section class="relative overflow-hidden bg-[#fdfbf7]">
 
     <div class="absolute inset-x-0 top-0 h-1.5 bg-[#1a5632]"></div>
@@ -388,7 +388,7 @@ body { font-family: var(--ff-body); }
             <div class="reveal-right visible relative">
                 <div class="relative rounded-[2rem] border border-white/80 bg-white p-3 shadow-2xl lg:ml-2">
                     <div class="overflow-hidden rounded-[1.55rem]">
-                        <img src="{{ $siteSettings->imageUrl('home_hero_image', 'assets/image/school_building.jpg') }}" alt="{{ __('site.school_name') }} Campus"
+                        <img src="{{ $siteSettings->imageUrl('home_hero_image', 'assets/image/default-placeholder.jpg') }}" alt="{{ __('site.school_name') }} Campus"
                              class="h-[280px] w-full object-cover sm:h-[380px] lg:h-[460px] parallax-img" id="hero-img">
                     </div>
                     <div class="absolute inset-x-8 bottom-8 rounded-2xl border border-white/20 bg-[#0b2415]/88 p-4 text-white shadow-xl backdrop-blur">
@@ -683,7 +683,7 @@ body { font-family: var(--ff-body); }
 
             <div class="relative grid lg:grid-cols-5 z-10">
                 <div class="lg:col-span-2 relative min-h-[260px] lg:min-h-0">
-                    <img src="{{ $siteSettings->imageUrl('home_principal_image', 'assets/image/school_building.jpg') }}" alt="{{ $siteSettings->get('principal_name') }}"
+                    <img src="{{ $siteSettings->imageUrl('home_principal_image', 'assets/image/default-placeholder.jpg') }}" alt="{{ $siteSettings->get('principal_name') }}"
                          class="absolute inset-0 w-full h-full object-cover object-top" loading="lazy">
                     <div class="absolute inset-0 bg-gradient-to-r from-transparent to-[#0b2415] hidden lg:block"></div>
                     <div class="absolute inset-0 bg-gradient-to-t from-[#0b2415] to-transparent lg:hidden"></div>
@@ -786,6 +786,7 @@ body { font-family: var(--ff-body); }
         </div>
     </div>
 </section>
+@endif
 
 @endsection
 

@@ -46,18 +46,83 @@
         @endforeach
     </div>
 
-    <form method="GET" class="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
-        <div class="grid gap-3 md:grid-cols-[1fr_180px_120px]">
-            <input name="search" value="{{ request('search') }}" placeholder="Search name, ID, email, mobile..." class="rounded-xl border border-gray-300 px-4 py-3 text-sm font-semibold focus:border-[#1a5632] focus:outline-none focus:ring-2 focus:ring-[#1a5632]/15">
-            <select name="type" class="rounded-xl border border-gray-300 px-4 py-3 text-sm font-semibold focus:border-[#1a5632] focus:outline-none focus:ring-2 focus:ring-[#1a5632]/15">
-                <option value="">All types</option>
-                @foreach($typeLabels as $value => $label)
-                    <option value="{{ $value }}" @selected(request('type') === $value)>{{ $label }}</option>
-                @endforeach
-            </select>
-            <button class="rounded-xl bg-[#1a5632] px-4 py-3 text-sm font-extrabold text-white">Filter</button>
+    <form id="hr-member-filter-form" method="GET" class="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm" x-data="districtFilter()">
+        <div class="grid gap-3">
+            <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-[1.8fr_1fr_1fr_1fr_1fr]">
+                <input name="search" value="{{ request('search') }}" placeholder="Search name, ID, email, mobile..." autocomplete="off" data-ajax-search class="w-full min-w-0 rounded-xl border border-gray-300 px-4 py-3 text-sm font-semibold focus:border-[#1a5632] focus:outline-none focus:ring-2 focus:ring-[#1a5632]/15">
+
+                <select name="type" class="w-full min-w-0 rounded-xl border border-gray-300 px-4 py-3 text-sm font-semibold focus:border-[#1a5632] focus:outline-none focus:ring-2 focus:ring-[#1a5632]/15">
+                    <option value="">All types</option>
+                    @foreach($typeLabels as $value => $label)
+                        <option value="{{ $value }}" @selected(request('type') === $value)>{{ $label }}</option>
+                    @endforeach
+                </select>
+
+                <select name="stream" class="w-full min-w-0 rounded-xl border border-gray-300 px-4 py-3 text-sm font-semibold focus:border-[#1a5632] focus:outline-none focus:ring-2 focus:ring-[#1a5632]/15">
+                    <option value="">All classes</option>
+                    @foreach($streams ?? [] as $stream)
+                        <option value="{{ $stream }}" @selected(request('stream') === $stream)>{{ $stream }}</option>
+                    @endforeach
+                </select>
+
+                <select name="section" class="w-full min-w-0 rounded-xl border border-gray-300 px-4 py-3 text-sm font-semibold focus:border-[#1a5632] focus:outline-none focus:ring-2 focus:ring-[#1a5632]/15">
+                    <option value="">All sections</option>
+                    @foreach($sections ?? [] as $section)
+                        <option value="{{ $section }}" @selected(request('section') === $section)>{{ $section }}</option>
+                    @endforeach
+                </select>
+
+                <select name="per_page" class="w-full min-w-0 rounded-xl border border-gray-300 px-4 py-3 text-sm font-semibold focus:border-[#1a5632] focus:outline-none focus:ring-2 focus:ring-[#1a5632]/15">
+                    @foreach([10,20,50,100] as $p)
+                        <option value="{{ $p }}" @selected((int)request('per_page', 20) === $p)>{{ $p }} per page</option>
+                    @endforeach
+                </select>
+            </div>
+
+            <div class="grid gap-3 md:grid-cols-3">
+                <select name="permanent_district" class="w-full min-w-0 rounded-xl border border-gray-300 px-4 py-3 text-sm font-semibold focus:border-[#1a5632] focus:outline-none focus:ring-2 focus:ring-[#1a5632]/15" @change="loadMunicipalities($el.value)" x-ref="district">
+                    <option value="">All districts</option>
+                    @foreach($districts ?? [] as $d)
+                        <option value="{{ $d }}" @selected(request('permanent_district') === $d)>{{ $d }}</option>
+                    @endforeach
+                </select>
+
+                <select name="permanent_municipality" class="w-full min-w-0 rounded-xl border border-gray-300 px-4 py-3 text-sm font-semibold focus:border-[#1a5632] focus:outline-none focus:ring-2 focus:ring-[#1a5632]/15" x-ref="municipality">
+                    <option value="">All municipalities</option>
+                    @foreach($municipalities ?? [] as $m)
+                        <option value="{{ $m }}" @selected(request('permanent_municipality') === $m)>{{ $m }}</option>
+                    @endforeach
+                </select>
+
+                <button class="w-full rounded-xl bg-[#1a5632] px-4 py-3 text-sm font-extrabold text-white">Filter</button>
+            </div>
         </div>
     </form>
+
+    <script>
+        function districtFilter() {
+            return {
+                loadMunicipalities(district) {
+                    if (!district) {
+                        this.$refs.municipality.innerHTML = '<option value="">All municipalities</option>';
+                        return;
+                    }
+
+                    fetch(`/api/hr/municipalities-by-district/${encodeURIComponent(district)}`)
+                        .then(res => res.json())
+                        .then(municipalities => {
+                            let options = '<option value="">All municipalities</option>';
+                            municipalities.forEach(m => {
+                                const selected = '{{ request("permanent_municipality") }}' === m ? ' selected' : '';
+                                options += `<option value="${m}"${selected}>${m}</option>`;
+                            });
+                            this.$refs.municipality.innerHTML = options;
+                        })
+                        .catch(err => console.error('Error loading municipalities:', err));
+                }
+            };
+        }
+    </script>
 
     @if($orphanUsers->isNotEmpty())
         <div class="rounded-2xl border border-amber-200 bg-amber-50 shadow-sm overflow-hidden">
@@ -97,83 +162,99 @@
         </div>
     @endif
 
-    <div class="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
-        <div class="overflow-x-auto">
-            <table class="min-w-full divide-y divide-gray-100">
-                <thead class="bg-gray-50">
-                    <tr>
-                        <th class="px-5 py-3 text-left text-xs font-extrabold uppercase tracking-widest text-gray-500">Member</th>
-                        <th class="px-5 py-3 text-left text-xs font-extrabold uppercase tracking-widest text-gray-500">Type</th>
-                        <th class="px-5 py-3 text-left text-xs font-extrabold uppercase tracking-widest text-gray-500">Class / Section</th>
-                        <th class="px-5 py-3 text-left text-xs font-extrabold uppercase tracking-widest text-gray-500">Linked Modules</th>
-                        <th class="px-5 py-3 text-right text-xs font-extrabold uppercase tracking-widest text-gray-500">Actions</th>
-                    </tr>
-                </thead>
-                <tbody class="divide-y divide-gray-100">
-                    @forelse($members as $member)
-                        <tr class="hover:bg-gray-50">
-                            <td class="px-5 py-4">
-                                <div class="flex items-center gap-3">
-                                    <img src="{{ $member->photo_url }}" alt="{{ $member->full_name }}" class="h-11 w-11 rounded-full object-cover ring-1 ring-gray-200">
-                                    <div>
-                                        <p class="font-extrabold text-gray-950">{{ $member->full_name }}</p>
-                                        <p class="text-sm font-medium text-gray-500">{{ $member->roll_number }} · {{ $member->email ?: 'No email' }}</p>
-                                    </div>
-                                </div>
-                            </td>
-                            <td class="px-5 py-4">
-                                <span class="inline-flex rounded-full border px-3 py-1 text-xs font-extrabold {{ $typeStyles[$member->member_type] ?? 'bg-gray-50 text-gray-600 border-gray-100' }}">
-                                    {{ $typeLabels[$member->member_type] ?? ucfirst($member->member_type) }}
-                                </span>
-                            </td>
-                            <td class="px-5 py-4 text-sm font-semibold text-gray-700">
-                                {{ $member->stream ?: '—' }}
-                                <span class="text-gray-400">/</span>
-                                {{ $member->section ?: '—' }}
-                            </td>
-                            <td class="px-5 py-4">
-                                <div class="flex flex-wrap gap-1.5">
-                                    <span class="rounded-full bg-indigo-50 px-2.5 py-1 text-xs font-bold text-indigo-700">ID Card</span>
-                                    @if($member->user)
-                                        <span class="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-700">Login</span>
-                                        @if($member->user->device_id)
-                                            <span class="rounded-full bg-amber-50 px-2.5 py-1 text-xs font-bold text-amber-700">Hajiri</span>
-                                        @endif
-                                        @if($member->user->hasAnyRole(['student', 'teacher']))
-                                            <span class="rounded-full bg-blue-50 px-2.5 py-1 text-xs font-bold text-blue-700">Learning</span>
-                                        @endif
-                                    @else
-                                        <span class="rounded-full bg-gray-100 px-2.5 py-1 text-xs font-bold text-gray-500">No Login</span>
-                                    @endif
-                                </div>
-                            </td>
-                            <td class="px-5 py-4 text-right">
-                                <div class="flex justify-end gap-2">
-                                    @if(auth()->user()?->canAccess('hr.members.edit'))
-                                        <a href="{{ route('admin.hr.members.edit', $member) }}" class="rounded-lg border border-gray-200 px-3 py-2 text-xs font-extrabold text-gray-700 hover:bg-gray-50">Edit</a>
-                                    @endif
-                                    @if(auth()->user()?->canAccess('hr.members.delete'))
-                                        <form method="POST" action="{{ route('admin.hr.members.destroy', $member) }}" onsubmit="return confirm('Remove this member from HR master?')">
-                                            @csrf
-                                            @method('DELETE')
-                                            <button class="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-extrabold text-red-600 hover:bg-red-100">Delete</button>
-                                        </form>
-                                    @endif
-                                </div>
-                            </td>
-                        </tr>
-                    @empty
-                        <tr>
-                            <td colspan="5" class="px-5 py-12 text-center">
-                                <p class="font-extrabold text-gray-900">No HR members yet.</p>
-                                <p class="mt-1 text-sm text-gray-500">Create the first student, teacher, or staff member from HR.</p>
-                            </td>
-                        </tr>
-                    @endforelse
-                </tbody>
-            </table>
-        </div>
-        <div class="border-t border-gray-100 px-5 py-4">{{ $members->links() }}</div>
+    <div id="hr-member-results">
+        @include('hr.members._table', ['members' => $members])
     </div>
 </div>
 @endsection
+
+@push('scripts')
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const form = document.getElementById('hr-member-filter-form');
+    const results = document.getElementById('hr-member-results');
+    if (!form || !results) return;
+
+    const searchInput = form.querySelector('[data-ajax-search]');
+    let searchTimer = null;
+    let controller = null;
+
+    const escapeRegex = value => String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+    const highlightMatches = () => {
+        const query = String(searchInput?.value || '').trim();
+        results.querySelectorAll('[data-highlight]').forEach(element => {
+            const text = element.textContent || '';
+            if (!query) {
+                element.textContent = text;
+                return;
+            }
+
+            const pattern = new RegExp(`(${escapeRegex(query)})`, 'ig');
+            element.innerHTML = text.replace(pattern, '<mark class="rounded bg-yellow-200 px-0.5 font-black text-gray-950">$1</mark>');
+        });
+    };
+
+    const currentUrl = pageUrl => {
+        const params = new URLSearchParams(new FormData(form));
+        [...params.entries()].forEach(([key, value]) => {
+            if (value === '') params.delete(key);
+        });
+        if (pageUrl) {
+            const pageParams = new URL(pageUrl, window.location.origin).searchParams;
+            const page = pageParams.get('page');
+            if (page) params.set('page', page);
+        }
+        const qs = params.toString();
+        return `${form.action || window.location.pathname}${qs ? `?${qs}` : ''}`;
+    };
+
+    const loadMembers = async (pageUrl = null) => {
+        if (controller) controller.abort();
+        controller = new AbortController();
+
+        const url = currentUrl(pageUrl);
+        results.classList.add('opacity-60');
+
+        try {
+            const response = await fetch(url, {
+                headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                signal: controller.signal,
+            });
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            const payload = await response.json();
+            results.innerHTML = payload.html || '';
+            window.history.replaceState({}, '', url);
+            highlightMatches();
+        } catch (error) {
+            if (error.name !== 'AbortError') console.error('Unable to load HR members:', error);
+        } finally {
+            results.classList.remove('opacity-60');
+        }
+    };
+
+    form.addEventListener('submit', event => {
+        event.preventDefault();
+        loadMembers();
+    });
+
+    searchInput?.addEventListener('input', () => {
+        clearTimeout(searchTimer);
+        searchTimer = setTimeout(() => loadMembers(), 250);
+    });
+
+    form.querySelectorAll('select').forEach(select => {
+        select.addEventListener('change', () => loadMembers());
+    });
+
+    results.addEventListener('click', event => {
+        const link = event.target.closest('a[href]');
+        if (!link || !link.closest('nav')) return;
+        event.preventDefault();
+        loadMembers(link.href);
+    });
+
+    highlightMatches();
+});
+</script>
+@endpush

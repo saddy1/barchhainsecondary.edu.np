@@ -7,7 +7,6 @@ use App\Models\Setting;
 use App\Support\SiteSettings;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\File;
-use Illuminate\Support\Str;
 
 class PrincipalController extends Controller
 {
@@ -52,15 +51,36 @@ class PrincipalController extends Controller
         }
 
         if ($request->hasFile('home_principal_image')) {
-            $img      = $request->file('home_principal_image');
-            $filename = 'principal-'.time().'.'.$img->getClientOriginalExtension();
-            File::ensureDirectoryExists(public_path('uploads/site'));
-            $img->move(public_path('uploads/site'), $filename);
-            Setting::updateOrCreate(['key' => 'home_principal_image'], ['value' => 'uploads/site/'.$filename]);
+            $this->replacePrincipalImage($request);
         }
 
         app(SiteSettings::class)->clearCache();
 
         return back()->with('success', 'Principal settings saved successfully.');
+    }
+
+    private function replacePrincipalImage(Request $request): void
+    {
+        $file = $request->file('home_principal_image');
+        $filename = 'home-principal-image.' . strtolower($file->getClientOriginalExtension());
+        $relativePath = 'uploads/site/' . $filename;
+        $targetPath = public_path($relativePath);
+
+        File::ensureDirectoryExists(public_path('uploads/site'));
+
+        $oldPath = Setting::where('key', 'home_principal_image')->value('value');
+        if ($oldPath && str_starts_with($oldPath, 'uploads/site/')) {
+            $oldFullPath = public_path($oldPath);
+            if (File::exists($oldFullPath)) {
+                File::delete($oldFullPath);
+            }
+        }
+
+        if (File::exists($targetPath)) {
+            File::delete($targetPath);
+        }
+
+        $file->move(public_path('uploads/site'), $filename);
+        Setting::updateOrCreate(['key' => 'home_principal_image'], ['value' => $relativePath]);
     }
 }

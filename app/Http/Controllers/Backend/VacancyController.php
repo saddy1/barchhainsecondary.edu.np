@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Vacancy;
 use App\Models\VacancyApplication;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class VacancyController extends Controller
 {
@@ -104,9 +105,19 @@ class VacancyController extends Controller
 
     public function destroy(Vacancy $vacancy)
     {
-        $this->deleteFile($vacancy->document_path);
-        $this->deleteFile($vacancy->featured_image);
-        $vacancy->delete();
+        DB::transaction(function () use ($vacancy) {
+            $vacancy->load('applications');
+
+            foreach ($vacancy->applications as $application) {
+                $this->deleteApplicationFiles($application);
+                $application->delete();
+            }
+
+            $this->deleteFile($vacancy->document_path);
+            $this->deleteFile($vacancy->featured_image);
+            $vacancy->delete();
+        });
+
         return redirect()->route('admin.vacancies.index')->with('success', 'Vacancy deleted successfully.');
     }
 
@@ -145,11 +156,7 @@ class VacancyController extends Controller
 
     public function destroyApplication(VacancyApplication $application)
     {
-        $this->deleteFile($application->cv_path);
-        $this->deleteFile($application->profile_photo);
-        $this->deleteFile($application->citizen_front_path);
-        $this->deleteFile($application->citizen_back_path);
-        $this->deleteFile($application->signature_path);
+        $this->deleteApplicationFiles($application);
         $application->delete();
         return redirect()->route('admin.vacancies.index')->with('success', 'Application deleted.');
     }
@@ -175,5 +182,14 @@ class VacancyController extends Controller
                 @unlink($full);
             }
         }
+    }
+
+    private function deleteApplicationFiles(VacancyApplication $application): void
+    {
+        $this->deleteFile($application->cv_path);
+        $this->deleteFile($application->profile_photo);
+        $this->deleteFile($application->citizen_front_path);
+        $this->deleteFile($application->citizen_back_path);
+        $this->deleteFile($application->signature_path);
     }
 }

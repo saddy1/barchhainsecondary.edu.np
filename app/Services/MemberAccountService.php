@@ -17,8 +17,10 @@ class MemberAccountService
 
         $user = $member->user ?: User::where('student_code', $loginCode)->first();
 
-        if (!$user && $member->email) {
-            $emailOwner = User::where('email', $member->email)->first();
+        if ($member->email) {
+            $emailOwner = User::where('email', $member->email)
+                ->when($user?->id, fn ($q) => $q->where('id', '!=', $user->id))
+                ->first();
             $email = $emailOwner ? $fallbackEmail : $member->email;
         }
 

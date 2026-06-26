@@ -78,7 +78,7 @@
         transform: rotate(270deg);
     }
   </style>
-    <script src="{{ asset('erp/hajiri/admin/plugins/jquery/jquery.min.js') }}"></script>
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/js/bootstrap.bundle.min.js" integrity="sha384-MrcW6ZMFYlzcLA8Nl+NtUVF0sA7MsXsP1UyJoMp4YLEuNSfAP+JcXn/tWtIaxVXM" crossorigin="anonymous"></script>
     <script src="https://unpkg.com/xlsx/dist/xlsx.full.min.js"></script>
 </head>
@@ -98,8 +98,9 @@
             <div class="w-100 d-none">
                 <table class="table-hajiri table table-bordered d-none">
                     @foreach($users as $user)
+                        @php $designationLabel = $user->designation->label ?? ''; @endphp
                         <tr  class="d-flex hajiri-data-table" style="height:15mm;" data-device-id="{{$user->device_id}}" id="tr-user-{{$user->device_id}}">
-                            <td style="width:45mm; font-size:3mm; vertical-align: center;"><b>{{$user["name"]}} <span style="font-size:2mm;">{{$user['device_id']}}</span></b><br/><span style="font-size:{{(strlen($user['designation']['label']) > 80)?'2.5mm;':'3mm'}}">{{$user['designation']['label']}}</span></td>
+                            <td style="width:45mm; font-size:3mm; vertical-align: center;"><b>{{$user["name"]}} <span style="font-size:2mm;">{{$user['device_id']}}</span></b><br/><span style="font-size:{{ strlen($designationLabel) > 80 ? '2.5mm;' : '3mm' }}">{{ $designationLabel }}</span></td>
                             <td style="width:230mm; font-size:3mm;">Loading Data for Employee: <b>{{$user->name}}</b> : {{$user->device_id}}</td>
                         </tr>
                     @endforeach
